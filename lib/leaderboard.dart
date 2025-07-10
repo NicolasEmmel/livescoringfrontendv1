@@ -41,8 +41,10 @@ class LeaderboardPage extends StatelessWidget {
             colors: [
               Color(0xFF959F96),
               Color(0xFFE5E5E5),
+              Color(0xFFE5E5E5),
             ],
-            radius: 1,
+            stops: [0.0,0.7,1.0],
+            radius: 0.8,
           ),
         ),
         child: SafeArea(
@@ -55,9 +57,16 @@ class LeaderboardPage extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Color.fromRGBO(255, 255, 255, 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color.fromRGBO(0, 0, 0, 0.05),
+                        blurRadius: 1,
+                        spreadRadius: 1,
+                        offset: Offset(0, 4)
+                        )
+                      ]
                   ),
                   child: Row(
                     children: [
@@ -79,7 +88,8 @@ class LeaderboardPage extends StatelessWidget {
               );
             },
           ),
-        ),)
+        ),
+        )
     );
   }
 }
