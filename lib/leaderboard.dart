@@ -30,40 +30,56 @@ class LeaderboardPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('LEADERBOARD'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: ListView.builder(
-        itemCount: samplePlayers.length,
-        itemBuilder: (context, index) {
-          final player = samplePlayers[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  Expanded(flex: 1, child: Text(player.position.toString())),
-                  Expanded(flex: 3, child: Text(player.name)),
-                  Expanded(flex: 1, child: Text(player.thru.toString())),
-                  Expanded(
-                    flex: 1,
-                    child: Text(
-                      player.toPar > 0
-                          ? '+${player.toPar}'
-                          : player.toPar.toString(),
-                    ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            colors: [
+              Color(0xFF959F96),
+              Color(0xFFE5E5E5),
+            ],
+            radius: 1,
+          ),
+        ),
+        child: SafeArea(
+          child: ListView.builder(
+            itemCount: samplePlayers.length,
+            itemBuilder: (context, index) {
+              final player = samplePlayers[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                  Expanded(flex: 1, child: Text(player.brutto.toString())),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 1, child: Text(player.position.toString())),
+                      Expanded(flex: 3, child: Text(player.name)),
+                      Expanded(flex: 1, child: Text(player.thru.toString())),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          player.toPar > 0
+                              ? '+${player.toPar}'
+                              : player.toPar.toString(),
+                        ),
+                      ),
+                      Expanded(flex: 1, child: Text(player.brutto.toString())),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),)
     );
   }
 }
