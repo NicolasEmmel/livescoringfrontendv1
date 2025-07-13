@@ -62,8 +62,8 @@ class LeaderboardPage extends StatelessWidget {
                     boxShadow: [
                       BoxShadow(
                         color: Color.fromRGBO(0, 0, 0, 0.05),
-                        blurRadius: 1,
-                        spreadRadius: 1,
+                        blurRadius: 0,
+                        spreadRadius: 2,
                         offset: Offset(0, 4)
                         )
                       ]

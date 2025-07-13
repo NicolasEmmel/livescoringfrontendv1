@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:livescoringfrontendv1/scoring.dart';
 import 'leaderboard.dart';
 
 void main() {
@@ -16,7 +17,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const LeaderboardPage(),
+      home: const ScoreManagementPage(),
     );
   }
 }
