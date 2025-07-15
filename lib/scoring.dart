@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/player.dart';
+import '../providers/flight_score_provider.dart';
+import 'models/hole.dart';
 
 class ScoreManagementPage extends StatefulWidget {
   const ScoreManagementPage({super.key});
@@ -11,50 +15,48 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
   final int totalHoles = 18;
   int currentHoleIndex = 0;
 
-  final List<Map<String, dynamic>> players = [
-    {'name': 'Max Mustermann', 'score': 4},
-    {'name': 'Erika Musterfrau', 'score': 5},
-    {'name': 'John Doe', 'score': 4},
-    {'name': 'Jane Doe', 'score': 6},
-  ];
-
-  final List<Map<String, dynamic>> holes = List.generate(
-    18,
-    (index) => {
-      'hole': index + 1,
-      'length': 400 + index * 5,
-      'par': (index % 3) + 3,
-      'strokeIndex': (index % 18) + 1,
-    },
-  );
-
-  void updateScore(int playerIndex, int delta) {
-    setState(() {
-      players[playerIndex]['score'] = (players[playerIndex]['score'] + delta)
-          .clamp(1, 12);
-    });
+  void updateScore(BuildContext context, String playerId, int delta) {
+    final scoreProvider = Provider.of<FlightScoreProvider>(
+      context,
+      listen: false,
+    );
+    final oldScore =
+        scoreProvider.getScore(playerId, currentHoleIndex.toString()) ?? 0;
+    final newScore = (oldScore + delta).clamp(1, 12);
+    scoreProvider.updateScore(
+      playerId: playerId,
+      holeId: currentHoleIndex.toString(),
+      score: newScore,
+    );
   }
 
-  void sendScoresToBackend(int holeIndex) {
-    print('Sending scores for hole ${holeIndex + 1}');
-    for (var player in players) {
-      print('${player['name']} scored ${player['score']}');
+  void sendScoresToBackend(BuildContext context, int holeIndex) {
+    final scoreProvider = Provider.of<FlightScoreProvider>(
+      context,
+      listen: false,
+    );
+    for (final player in scoreProvider.players) {
+      final score =
+          scoreProvider.getScore(player.id, holeIndex.toString()) ?? 0;
+      print('${player.name} scored $score on hole ${holeIndex + 1}');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final players = Provider.of<FlightScoreProvider>(context).players;
+    final holes = Provider.of<FlightScoreProvider>(context).holes;
+
+    if (holes.isEmpty) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
-            colors: [
-              Color(0xFF959F96),
-              Color.fromARGB(255, 227, 227, 227),
-              Color.fromARGB(255, 234, 234, 234),
-            ],
+            colors: [Color(0xFF959F96), Color(0xFFE5E5E5), Color(0xFFE5E5E5)],
             stops: [0.0, 0.7, 1.0],
             radius: 0.8,
           ),
@@ -63,7 +65,7 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
           itemCount: totalHoles,
           controller: PageController(initialPage: currentHoleIndex),
           onPageChanged: (index) {
-            sendScoresToBackend(currentHoleIndex);
+            sendScoresToBackend(context, currentHoleIndex);
             setState(() => currentHoleIndex = index);
           },
           itemBuilder: (context, index) {
@@ -97,20 +99,20 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                               top: 0,
                               right: 0,
                               child: Text(
-                                'Hole ${hole['hole']}',
+                                'Hole ${hole.number}',
                                 style: const TextStyle(fontSize: 16),
                               ),
                             ),
                             Positioned(
                               bottom: 0,
                               left: 0,
-                              child: Text('${hole['length']} m'),
+                              child: Text('${hole.length} m'),
                             ),
                             Positioned(
                               bottom: 0,
                               right: 0,
                               child: Text(
-                                'Par ${hole['par']} | SI ${hole['strokeIndex']}',
+                                'Par ${hole.par} | SI ${hole.strokeIndex}',
                               ),
                             ),
                             const Center(
@@ -128,9 +130,16 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                         vertical: 4,
                       ),
                       child: Column(
-                        children: players.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final player = entry.value;
+                        children: players.map((player) {
+                          final score =
+                              Provider.of<FlightScoreProvider>(
+                                context,
+                              ).getScore(
+                                player.id,
+                                currentHoleIndex.toString(),
+                              ) ??
+                              0;
+                          final nameParts = player.name.split(' ');
 
                           return Expanded(
                             child: Padding(
@@ -159,23 +168,20 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          player['name'].split(
-                                            ' ',
-                                          )[0], // First name
+                                          nameParts[0],
                                           style: const TextStyle(
                                             fontSize: 20,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                        Text(
-                                          player['name'].split(
-                                            ' ',
-                                          )[1], // Last name
-                                          style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
+                                        if (nameParts.length > 1)
+                                          Text(
+                                            nameParts.sublist(1).join(' '),
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -184,10 +190,11 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                                     children: [
                                       IconButton(
                                         icon: const Icon(Icons.remove),
-                                        onPressed: () => updateScore(i, -1),
+                                        onPressed: () =>
+                                            updateScore(context, player.id, -1),
                                       ),
                                       Text(
-                                        '${player['score']}',
+                                        '$score',
                                         style: const TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.bold,
@@ -195,7 +202,8 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.add),
-                                        onPressed: () => updateScore(i, 1),
+                                        onPressed: () =>
+                                            updateScore(context, player.id, 1),
                                       ),
                                     ],
                                   ),

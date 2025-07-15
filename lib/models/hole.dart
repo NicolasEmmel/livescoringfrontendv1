@@ -1,0 +1,22 @@
+class Hole {
+  final int number;
+  final int length;
+  final int par;
+  final int strokeIndex;
+
+  Hole({
+    required this.number,
+    required this.length,
+    required this.par,
+    required this.strokeIndex,
+  });
+
+  factory Hole.fromJson(Map<String, dynamic> json) {
+    return Hole(
+      number: json['number'],
+      length: json['length'],
+      par: json['par'],
+      strokeIndex: json['strokeIndex'],
+    );
+  }
+}
