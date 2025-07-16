@@ -41,7 +41,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
       final String scannedTeeId = decoded['teeId'];
 
       String flightBase =
-          "http://192.168.2.172:5001/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId";
+          'https://golf-livescoring-backend-v1.fly.dev/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId';
+      //"http://192.168.2.172:5001/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId";
 
       final response = await http.get(Uri.parse(flightBase));
 
@@ -71,7 +72,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
           final holesRes = await http.get(
             Uri.parse(
-              'http://192.168.2.172:5001/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
+              'https://golf-livescoring-backend-v1.fly.dev/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
             ),
           );
           if (holesRes.statusCode == 200) {

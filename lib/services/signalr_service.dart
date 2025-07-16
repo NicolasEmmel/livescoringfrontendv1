@@ -16,7 +16,8 @@ class SignalRService {
     _scoreProvider = provider;
   }
 
-  final String baseUrl = 'http://192.168.2.172:5001/scorehub';
+  final String baseUrl =
+      'https://golf-livescoring-backend-v1.fly.dev/scorehub'; //'http://192.168.2.172:5001/scorehub';
 
   bool get isConnected => _isConnected;
 
