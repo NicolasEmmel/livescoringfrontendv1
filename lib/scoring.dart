@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../models/player.dart';
 import '../providers/flight_score_provider.dart';
 import 'models/hole.dart';
+import 'services/signalr_service.dart';
+import 'leaderboard.dart';
 
 class ScoreManagementPage extends StatefulWidget {
   const ScoreManagementPage({super.key});
@@ -23,6 +25,7 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
     final oldScore =
         scoreProvider.getScore(playerId, currentHoleIndex.toString()) ?? 0;
     final newScore = (oldScore + delta).clamp(1, 12);
+
     scoreProvider.updateScore(
       playerId: playerId,
       holeId: currentHoleIndex.toString(),
@@ -30,15 +33,46 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
     );
   }
 
-  void sendScoresToBackend(BuildContext context, int holeIndex) {
+  Future<void> sendScoresToBackend(BuildContext context, int holeIndex) async {
     final scoreProvider = Provider.of<FlightScoreProvider>(
       context,
       listen: false,
     );
+
+    final Map<String, Map<String, int>> scoreData = {};
+
     for (final player in scoreProvider.players) {
-      final score =
-          scoreProvider.getScore(player.id, holeIndex.toString()) ?? 0;
-      print('${player.name} scored $score on hole ${holeIndex + 1}');
+      final String playerId = player.id;
+      final Map<String, int>? playerScores = scoreProvider.getPlayerScores(
+        playerId,
+      );
+
+      if (playerScores != null) {
+        for (final entry in playerScores.entries) {
+          final int rawScore = entry.value;
+
+          final int scoreRelativeToPar =
+              rawScore - scoreProvider.holes[int.parse(entry.key)].par;
+
+          scoreData.putIfAbsent(playerId, () => {});
+          scoreData[playerId]![entry.key] = scoreRelativeToPar;
+        }
+      }
+    }
+
+    // Replace with your real tournamentId
+    final String tournamentId = scoreProvider.tournamentId;
+
+    // Send to SignalR hub method "SendScoreUpdate"
+
+    final signalR = Provider.of<SignalRService>(context, listen: false);
+
+    if (signalR.isConnected) {
+      signalR.sendScoreUpdate([scoreData, tournamentId]).catchError((e) {
+        print("Failed to send score update: $e");
+      });
+    } else {
+      print('Not connected');
     }
   }
 
@@ -64,8 +98,8 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
         child: PageView.builder(
           itemCount: totalHoles,
           controller: PageController(initialPage: currentHoleIndex),
-          onPageChanged: (index) {
-            sendScoresToBackend(context, currentHoleIndex);
+          onPageChanged: (index) async {
+            await sendScoresToBackend(context, currentHoleIndex);
             setState(() => currentHoleIndex = index);
           },
           itemBuilder: (context, index) {
@@ -213,6 +247,29 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                           );
                         }).toList(),
                       ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        backgroundColor: Colors.green[700],
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.leaderboard),
+                      label: const Text("Go to Leaderboard"),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LeaderboardPage(),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],

@@ -1,18 +1,27 @@
+import 'dart:convert';
+
+import 'package:livescoringfrontendv1/models/leaderboard.dart';
+import 'package:provider/provider.dart';
 import 'package:signalr_netcore/signalr_client.dart';
+
+import '../providers/flight_score_provider.dart';
 
 class SignalRService {
   late final HubConnection _hubConnection;
   bool _isConnected = false;
 
-  final String baseUrl;
-  final String playerId;
+  FlightScoreProvider? _scoreProvider;
 
-  SignalRService({required this.baseUrl, required this.playerId});
+  void setScoreProvider(FlightScoreProvider provider) {
+    _scoreProvider = provider;
+  }
+
+  final String baseUrl = 'http://192.168.2.172:5001/scorehub';
 
   bool get isConnected => _isConnected;
 
-  Future<void> startConnection() async {
-    final url = '$baseUrl?playerId=$playerId';
+  Future<void> startConnection(String tournamentId) async {
+    final url = '$baseUrl?tournamentId=$tournamentId';
 
     final httpOptions = HttpConnectionOptions(
       transport: HttpTransportType.WebSockets,
@@ -23,24 +32,46 @@ class SignalRService {
         .withAutomaticReconnect()
         .build();
 
+    // Example listener
+    _hubConnection.on("ReceiveScoreUpdate", (List<Object?>? arguments) {
+      print("📨 Raw SignalR arguments: $arguments");
+
+      if (arguments != null && arguments.isNotEmpty) {
+        final data = arguments[0];
+
+        if (data is Map<String, dynamic>) {
+          try {
+            final leaderboard = Leaderboard.fromJson(data);
+            print(
+              "✅ Received Leaderboard: ${leaderboard.entries.length} entries",
+            );
+
+            _scoreProvider?.setLeaderboard(leaderboard);
+          } catch (e) {
+            print("❌ Failed to parse leaderboard: $e");
+          }
+        } else {
+          print("⚠️ Invalid leaderboard data format: $data");
+        }
+      }
+    });
+
+    _hubConnection.on("TestMessage", (arguments) {
+      print("📨 Message received: $arguments");
+    });
+
     _hubConnection.onclose(({error}) {
       print("Connection closed");
       _isConnected = false;
     });
 
     _hubConnection.onreconnecting(({error}) {
+      _isConnected = false;
       print("🔄 Reconnecting to SignalR...");
     });
 
     _hubConnection.onreconnected(({connectionId}) {
       _isConnected = true;
-    });
-
-    // Example listener
-    _hubConnection.on("ReceiveMessage", (arguments) {
-      final from = arguments?[0];
-      final msg = arguments?[1];
-      print("📨 Message from $from: $msg");
     });
 
     try {
@@ -61,16 +92,35 @@ class SignalRService {
     }
   }
 
-  Future<void> sendMessage(String method, List<Object> args) async {
+  Future<void> sendScoreUpdate(List<Object> args) async {
+    const method = 'SendScoreUpdate';
+
     if (_hubConnection.state == HubConnectionState.Connected) {
       try {
+        print('📡 Sending score update...');
         await _hubConnection.invoke(method, args: args);
         print("📤 Sent message: $method => $args");
-      } catch (e) {
-        print("❌ Failed to send message: $e");
+        return;
+      } catch (e, stack) {
+        print('stack: $e');
+        await Future.delayed(const Duration(milliseconds: 300));
       }
     } else {
-      print("⚠️ Can't send message. Not connected.");
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+  }
+
+  Future<void> waitForConnectionReady({int retries = 10}) async {
+    int attempts = 0;
+    while (_hubConnection.state != HubConnectionState.Connected &&
+        attempts < retries) {
+      print("⏳ Waiting for SignalR connection...");
+      await Future.delayed(const Duration(milliseconds: 500));
+      attempts++;
+    }
+
+    if (_hubConnection.state != HubConnectionState.Connected) {
+      throw Exception("SignalR not connected after $retries attempts.");
     }
   }
 

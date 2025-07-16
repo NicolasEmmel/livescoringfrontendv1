@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:livescoringfrontendv1/services/signalr_service.dart';
 import 'package:provider/provider.dart';
 import 'package:livescoringfrontendv1/landingpage.dart';
 import 'package:livescoringfrontendv1/scoring.dart';
@@ -6,9 +7,15 @@ import 'leaderboard.dart';
 import 'providers/flight_score_provider.dart';
 
 void main() {
+  final signalRService = SignalRService();
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => FlightScoreProvider())],
+      providers: [
+        Provider<SignalRService>.value(value: signalRService),
+        ChangeNotifierProvider(
+          create: (_) => FlightScoreProvider(signalRService),
+        ),
+      ],
       child: const MyApp(), // replace with your root widget
     ),
   );

@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'models/player.dart';
 import 'models/hole.dart';
 import '../providers/flight_score_provider.dart';
+import 'services/signalr_service.dart';
 
 class QRScannerPage extends StatefulWidget {
   const QRScannerPage({super.key});
@@ -29,6 +30,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
       isProcessing = true;
       errorMessage = null;
     });
+
+    String testOutput = "";
 
     try {
       final decoded = jsonDecode(rawData);
@@ -72,6 +75,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
             ),
           );
           if (holesRes.statusCode == 200) {
+            testOutput = holesRes.body;
+
             final holeList = jsonDecode(holesRes.body) as List;
             final holes = holeList.map((h) => Hole.fromJson(h)).toList();
 
@@ -91,6 +96,17 @@ class _QRScannerPageState extends State<QRScannerPage> {
           // TournamentId match (if flight also contains tournamentId)
           // If not in the API response, skip this check or adapt it
 
+          Provider.of<FlightScoreProvider>(
+            context,
+            listen: false,
+          ).setTournamentId(scannedTournamentId);
+
+          final signalR = Provider.of<SignalRService>(context, listen: false);
+          signalR.setScoreProvider(
+            Provider.of<FlightScoreProvider>(context, listen: false),
+          );
+          await signalR.startConnection(scannedTournamentId);
+
           //  Success: navigate to scoring
           if (!mounted) return;
           Navigator.push(
@@ -105,7 +121,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
         setState(() => errorMessage = 'API error: ${response.statusCode}');
       }
     } catch (e) {
-      setState(() => errorMessage = 'Invalid QR code or network error.');
+      setState(() => errorMessage = testOutput);
     }
 
     controller.start();
