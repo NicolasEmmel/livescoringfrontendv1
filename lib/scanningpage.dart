@@ -122,7 +122,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
         setState(() => errorMessage = 'API error: ${response.statusCode}');
       }
     } catch (e) {
-      setState(() => errorMessage = e.toString());
+      setState(() => errorMessage = 'Wrong QR Code');
     }
 
     controller.start();
