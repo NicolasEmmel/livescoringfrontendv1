@@ -41,8 +41,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
       final String scannedTeeId = decoded['teeId'];
 
       String flightBase =
-          'https://golf-livescoring-backend-v1.fly.dev/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId';
-      //"http://192.168.2.172:5001/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId";
+          //'http://192.168.2.172:5001/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId';
+          "https://golf-livescoring-backend-v1.fly.dev/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId";
 
       final response = await http.get(Uri.parse(flightBase));
 
@@ -72,6 +72,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
           final holesRes = await http.get(
             Uri.parse(
+              //'http://192.168.2.172:5001/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
               'https://golf-livescoring-backend-v1.fly.dev/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
             ),
           );
@@ -106,7 +107,10 @@ class _QRScannerPageState extends State<QRScannerPage> {
           signalR.setScoreProvider(
             Provider.of<FlightScoreProvider>(context, listen: false),
           );
-          await signalR.startConnection(scannedTournamentId);
+          await signalR.startConnection(
+            scannedTournamentId,
+            flightId: scannedFlightId,
+          );
 
           //  Success: navigate to scoring
           if (!mounted) return;
@@ -116,13 +120,15 @@ class _QRScannerPageState extends State<QRScannerPage> {
           );
           return;
         } else {
-          setState(() => errorMessage = 'Flight not found.' + response.body);
+          setState(() => errorMessage = 'Flight konntenicht gefunden werden');
         }
       } else {
         setState(() => errorMessage = 'API error: ${response.statusCode}');
       }
     } catch (e) {
-      setState(() => errorMessage = 'Wrong QR Code');
+      setState(
+        () => errorMessage = 'Fehler beim Scannen, bitte erneut versuchen',
+      );
     }
 
     controller.start();
@@ -138,7 +144,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan QR Code')),
+      appBar: AppBar(title: const Text('QR Code Scannen')),
       body: Column(
         children: [
           Expanded(
@@ -180,7 +186,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                       ],
                     )
                   : const Text(
-                      'Scan a QR code to begin',
+                      'Scanne deinen QR Code um zu beginnen',
                       style: TextStyle(fontSize: 16),
                     ),
             ),

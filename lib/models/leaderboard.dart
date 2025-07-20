@@ -19,7 +19,8 @@ class LeaderboardEntry {
   final int thru;
   final int brutto;
   final int netto;
-  final String category;
+  final String tournamentName;
+  final String playerId;
 
   LeaderboardEntry({
     required this.name,
@@ -27,7 +28,8 @@ class LeaderboardEntry {
     required this.thru,
     required this.brutto,
     required this.netto,
-    required this.category,
+    required this.tournamentName,
+    required this.playerId,
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
@@ -37,7 +39,8 @@ class LeaderboardEntry {
       thru: json['thru'],
       brutto: json['brutto'],
       netto: json['netto'],
-      category: json['category'],
+      tournamentName: json['tournamentName'],
+      playerId: json['playerId'],
     );
   }
 }

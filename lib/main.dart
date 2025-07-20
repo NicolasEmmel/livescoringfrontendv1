@@ -11,7 +11,7 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        Provider<SignalRService>.value(value: signalRService),
+        ChangeNotifierProvider<SignalRService>.value(value: signalRService),
         ChangeNotifierProvider(
           create: (_) => FlightScoreProvider(signalRService),
         ),

@@ -24,6 +24,7 @@ class FlightScoreProvider with ChangeNotifier {
 
   void setLeaderboard(Leaderboard leaderboard) {
     _leaderboard = leaderboard;
+    notifyListeners();
   }
 
   void setFlightPlayers(List<Player> players) {

@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/flight_score_provider.dart';
 import '../models/leaderboard.dart';
+import 'services/signalr_service.dart';
 import 'scoring.dart';
+import 'landingpage.dart';
 
 class LeaderboardPage extends StatelessWidget {
-  const LeaderboardPage({super.key});
+  final String? source; // 'landing' or 'scoring'
+  final int? currentHole; // Current hole when coming from scoring page
+
+  const LeaderboardPage({super.key, this.source, this.currentHole});
 
   @override
   Widget build(BuildContext context) {
     final leaderboard = Provider.of<FlightScoreProvider>(context).leaderboard;
+    final signalR = Provider.of<SignalRService>(context);
 
     return Scaffold(
       body: Container(
@@ -23,7 +29,96 @@ class LeaderboardPage extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: leaderboard == null
+          child: signalR.isConnecting
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF2E7D32),
+                        ),
+                        strokeWidth: 3,
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'Verbinde mit Server...',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : signalR.connectionError != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Verbindungsfehler',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          signalR.connectionError!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      ElevatedButton(
+                        onPressed: () async {
+                          signalR.clearError();
+                          try {
+                            await signalR.startConnection(
+                              'xxx',
+                              flightId: 'xxx',
+                            );
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Erneuter Verbindungsversuch fehlgeschlagen: ${e.toString()}',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: const Text('Erneut versuchen'),
+                      ),
+                    ],
+                  ),
+                )
+              : leaderboard == null
               ? const Center(
                   child: Text(
                     'No leaderboard data available.',
@@ -282,28 +377,73 @@ class LeaderboardPage extends StatelessWidget {
                       padding: const EdgeInsets.all(16),
                       child: Center(
                         child: Container(
-                          width: 60,
-                          height: 60,
+                          width: 80,
+                          height: 80,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.black, width: 2),
-                            color: Colors.white,
+                            color: const Color(0xFFE1F2D9),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 1,
+                                spreadRadius: 0,
+                                offset: Offset(0, 3),
+                              ),
+                            ],
                           ),
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.score,
-                              size: 28,
-                              color: Colors.black,
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const ScoreManagementPage(),
-                                ),
-                              );
+                          child: GestureDetector(
+                            onTap: () async {
+                              if (source == 'landing') {
+                                // Disconnect from SignalR and return to landing page
+                                final signalR = Provider.of<SignalRService>(
+                                  context,
+                                  listen: false,
+                                );
+                                await signalR.stopConnection();
+
+                                if (context.mounted) {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const LandingPage(),
+                                    ),
+                                    (route) =>
+                                        false, // Remove all previous routes
+                                  );
+                                }
+                              } else {
+                                // Go back to scoring page with current hole
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ScoreManagementPage(
+                                      initialHole: currentHole ?? 0,
+                                    ),
+                                  ),
+                                );
+                              }
                             },
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  source == 'landing'
+                                      ? Icons.home
+                                      : Icons.score,
+                                  size: 24,
+                                  color: Colors.black,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  source == 'landing' ? 'Home' : 'Score',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

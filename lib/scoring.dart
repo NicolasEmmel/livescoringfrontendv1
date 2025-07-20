@@ -5,9 +5,13 @@ import '../providers/flight_score_provider.dart';
 import 'models/hole.dart';
 import 'services/signalr_service.dart';
 import 'leaderboard.dart';
+import 'landingpage.dart';
+import 'scores_summary_page.dart';
 
 class ScoreManagementPage extends StatefulWidget {
-  const ScoreManagementPage({super.key});
+  final int initialHole;
+
+  const ScoreManagementPage({super.key, this.initialHole = 0});
 
   @override
   State<ScoreManagementPage> createState() => _ScoreManagementPageState();
@@ -15,7 +19,7 @@ class ScoreManagementPage extends StatefulWidget {
 
 class _ScoreManagementPageState extends State<ScoreManagementPage> {
   final int totalHoles = 18;
-  int currentHoleIndex = 0;
+  late int currentHoleIndex;
   PageController? _pageController;
   bool _showSuccessMessage = false;
 
@@ -81,6 +85,7 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
   @override
   void initState() {
     super.initState();
+    currentHoleIndex = widget.initialHole;
     _pageController = PageController(initialPage: currentHoleIndex);
   }
 
@@ -88,6 +93,90 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
   void dispose() {
     _pageController?.dispose();
     super.dispose();
+  }
+
+  bool _areAllHolesScored() {
+    final scoreProvider = Provider.of<FlightScoreProvider>(
+      context,
+      listen: false,
+    );
+
+    for (final player in scoreProvider.players) {
+      for (int i = 0; i < totalHoles; i++) {
+        final score = scoreProvider.getScore(player.id, i.toString());
+        if (score == null || score == 0) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  void _showFinalConfirmationDialog(BuildContext context) {
+    final allScored = _areAllHolesScored();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                allScored ? Icons.check_circle : Icons.warning,
+                color: allScored ? const Color(0xFF2E7D32) : Colors.orange,
+                size: 32,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                allScored ? 'Round Complete!' : 'Round Finished',
+                style: TextStyle(
+                  color: allScored ? const Color(0xFF2E7D32) : Colors.orange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            allScored
+                ? 'All scores have been submitted successfully. Would you like to view the complete scores summary?'
+                : 'Some holes may not have scores recorded. Would you like to view the current scores summary anyway?',
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+              },
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                // Navigate to scores summary page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ScoresSummaryPage(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('View Summary'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -156,9 +245,50 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                                 Positioned(
                                   top: 0,
                                   right: 0,
-                                  child: Text(
-                                    'Hole ${hole.number}',
-                                    style: const TextStyle(fontSize: 16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.baseline,
+                                        textBaseline: TextBaseline.alphabetic,
+                                        children: [
+                                          const Text(
+                                            'Loch ',
+                                            style: TextStyle(fontSize: 16),
+                                          ),
+                                          Text(
+                                            '${hole.number}',
+                                            style: const TextStyle(
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (index == totalHoles - 1)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF2E7D32),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'FINAL HOLE',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                                 Positioned(
@@ -354,25 +484,28 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                                     _showSuccessMessage = true;
                                   });
 
-                                  // Hide message after 1 second and go to next hole
-                                  Future.delayed(
-                                    const Duration(seconds: 1),
-                                    () {
-                                      if (mounted) {
-                                        setState(() {
-                                          _showSuccessMessage = false;
-                                        });
-                                        if (currentHoleIndex < totalHoles - 1) {
-                                          _pageController?.nextPage(
-                                            duration: const Duration(
-                                              milliseconds: 300,
-                                            ),
-                                            curve: Curves.easeInOut,
-                                          );
-                                        }
+                                  // Hide message after 1 second and handle navigation
+                                  Future.delayed(const Duration(seconds: 1), () {
+                                    if (mounted) {
+                                      setState(() {
+                                        _showSuccessMessage = false;
+                                      });
+
+                                      // Check if this is the last hole
+                                      if (currentHoleIndex == totalHoles - 1) {
+                                        // Show confirmation dialog for last hole
+                                        _showFinalConfirmationDialog(context);
+                                      } else {
+                                        // Go to next hole
+                                        _pageController?.nextPage(
+                                          duration: const Duration(
+                                            milliseconds: 300,
+                                          ),
+                                          curve: Curves.easeInOut,
+                                        );
                                       }
-                                    },
-                                  );
+                                    }
+                                  });
                                 },
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -417,8 +550,10 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) =>
-                                          const LeaderboardPage(),
+                                      builder: (context) => LeaderboardPage(
+                                        source: 'scoring',
+                                        currentHole: currentHoleIndex,
+                                      ),
                                     ),
                                   );
                                 },
@@ -433,6 +568,66 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                                     const SizedBox(height: 4),
                                     const Text(
                                       'Board',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            // Home button
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFE1F2D9),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 1,
+                                    spreadRadius: 0,
+                                    offset: Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: GestureDetector(
+                                onTap: () async {
+                                  // Disconnect from SignalR if connected
+                                  final signalR = Provider.of<SignalRService>(
+                                    context,
+                                    listen: false,
+                                  );
+                                  await signalR.stopConnection();
+
+                                  // Navigate back to landing page and clear the stack
+                                  if (context.mounted) {
+                                    Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const LandingPage(),
+                                      ),
+                                      (route) =>
+                                          false, // Remove all previous routes
+                                    );
+                                  }
+                                },
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.home,
+                                      size: 24,
+                                      color: Colors.black,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Home',
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w600,

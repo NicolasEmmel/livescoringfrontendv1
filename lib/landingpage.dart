@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:livescoringfrontendv1/scanningpage.dart';
 import 'package:livescoringfrontendv1/leaderboard.dart';
+import '../providers/flight_score_provider.dart';
+import 'services/signalr_service.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -28,7 +31,8 @@ class LandingPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 40),
                 const Text(
-                  'Live Scoring',
+                  'Clubmeisterschaften GC Kitzingen',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -79,7 +83,7 @@ class LandingPage extends StatelessWidget {
                               ),
                               SizedBox(width: 12),
                               Text(
-                                'Scan QR Code',
+                                'Scanne Flight QR Code',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w600,
@@ -116,37 +120,94 @@ class LandingPage extends StatelessWidget {
                     ),
                     child: Material(
                       color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LeaderboardPage(),
+                      child: Consumer<SignalRService>(
+                        builder: (context, signalR, child) {
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: signalR.isConnecting
+                                ? null
+                                : () async {
+                                    try {
+                                      // Start SignalR connection with tournament ID 'xxx'
+                                      signalR.setScoreProvider(
+                                        Provider.of<FlightScoreProvider>(
+                                          context,
+                                          listen: false,
+                                        ),
+                                      );
+                                      await signalR.startConnection(
+                                        'xxx',
+                                        flightId: 'xxx',
+                                      );
+
+                                      // Navigate to leaderboard
+                                      if (context.mounted) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const LeaderboardPage(
+                                                  source: 'landing',
+                                                ),
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Verbindungsfehler: ${e.toString()}',
+                                            ),
+                                            backgroundColor: Colors.red,
+                                            duration: const Duration(
+                                              seconds: 3,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (signalR.isConnecting)
+                                    const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Color(0xFF2E7D32),
+                                            ),
+                                      ),
+                                    )
+                                  else
+                                    const Icon(
+                                      Icons.leaderboard,
+                                      color: Color(0xFF2E7D32),
+                                      size: 28,
+                                    ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    signalR.isConnecting
+                                        ? 'Verbinde...'
+                                        : 'Leaderboard ansehen',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
-                        child: const Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.leaderboard,
-                                color: Color(0xFF2E7D32),
-                                size: 28,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'View Leaderboard',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2E7D32),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ),
