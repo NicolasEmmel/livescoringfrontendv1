@@ -17,6 +17,10 @@ class LeaderboardPage extends StatelessWidget {
     final leaderboard = Provider.of<FlightScoreProvider>(context).leaderboard;
     final signalR = Provider.of<SignalRService>(context);
 
+    // Sort leaderboard entries by toPar score (best score first)
+    final sortedEntries = leaderboard?.entries.toList() ?? [];
+    sortedEntries.sort((a, b) => a.toPar.compareTo(b.toPar));
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -245,9 +249,9 @@ class LeaderboardPage extends StatelessWidget {
                             // Entries list
                             Expanded(
                               child: ListView.builder(
-                                itemCount: leaderboard.entries.length,
+                                itemCount: sortedEntries.length,
                                 itemBuilder: (context, index) {
-                                  final entry = leaderboard.entries[index];
+                                  final entry = sortedEntries[index];
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 12),
                                     padding: const EdgeInsets.symmetric(
