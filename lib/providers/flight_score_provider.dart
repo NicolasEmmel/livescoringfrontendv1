@@ -75,4 +75,9 @@ class FlightScoreProvider with ChangeNotifier {
   }
 
   Map<String, Map<String, int>> getAllScores() => _scores;
+
+  void clearAllScores() {
+    _scores.clear();
+    notifyListeners();
+  }
 }

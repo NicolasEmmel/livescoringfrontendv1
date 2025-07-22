@@ -44,7 +44,14 @@ class _QRScannerPageState extends State<QRScannerPage> {
           //'http://192.168.2.172:5001/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId';
           "https://golf-livescoring-backend-v1.fly.dev/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId";
 
-      final response = await http.get(Uri.parse(flightBase));
+      final response = await http.get(
+        Uri.parse(flightBase),
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -75,6 +82,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
               //'http://192.168.2.172:5001/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
               'https://golf-livescoring-backend-v1.fly.dev/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
             ),
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
           );
           if (holesRes.statusCode == 200) {
             testOutput = holesRes.body;

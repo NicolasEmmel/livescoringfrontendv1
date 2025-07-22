@@ -306,26 +306,26 @@ class ScoresSummaryPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // Back to Scoring button
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFFE1F2D9),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 1,
-                            spreadRadius: 0,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: GestureDetector(
-                        onTap: () {
-                          // Navigate back to scoring page (will return to last hole)
-                          Navigator.pop(context);
-                        },
+                    GestureDetector(
+                      onTap: () {
+                        // Navigate back to scoring page (will return to last hole)
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFE1F2D9),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 1,
+                              spreadRadius: 0,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -349,41 +349,41 @@ class ScoresSummaryPage extends StatelessWidget {
                     ),
                     const SizedBox(width: 20),
                     // Home button
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFFE1F2D9),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 1,
-                            spreadRadius: 0,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: GestureDetector(
-                        onTap: () async {
-                          // Disconnect from SignalR if connected
-                          final signalR = Provider.of<SignalRService>(
-                            context,
-                            listen: false,
-                          );
-                          await signalR.stopConnection();
+                    GestureDetector(
+                      onTap: () async {
+                        // Disconnect from SignalR if connected
+                        final signalR = Provider.of<SignalRService>(
+                          context,
+                          listen: false,
+                        );
+                        await signalR.stopConnection();
 
-                          // Navigate back to landing page and clear the stack
-                          if (context.mounted) {
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const LandingPage(),
-                              ),
-                              (route) => false, // Remove all previous routes
-                            );
-                          }
-                        },
+                        // Navigate back to landing page and clear the stack
+                        if (context.mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LandingPage(),
+                            ),
+                            (route) => false, // Remove all previous routes
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFE1F2D9),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 1,
+                              spreadRadius: 0,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [

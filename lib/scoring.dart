@@ -459,54 +459,54 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             // Send scores button
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFE1F2D9),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 1,
-                                    spreadRadius: 0,
-                                    offset: Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: GestureDetector(
-                                onTap: () async {
-                                  await sendScoresToBackend(
-                                    context,
-                                    currentHoleIndex,
-                                  );
-                                  setState(() {
-                                    _showSuccessMessage = true;
-                                  });
+                            GestureDetector(
+                              onTap: () async {
+                                await sendScoresToBackend(
+                                  context,
+                                  currentHoleIndex,
+                                );
+                                setState(() {
+                                  _showSuccessMessage = true;
+                                });
 
-                                  // Hide message after 1 second and handle navigation
-                                  Future.delayed(const Duration(seconds: 1), () {
-                                    if (mounted) {
-                                      setState(() {
-                                        _showSuccessMessage = false;
-                                      });
+                                // Hide message after 1 second and handle navigation
+                                Future.delayed(const Duration(seconds: 1), () {
+                                  if (mounted) {
+                                    setState(() {
+                                      _showSuccessMessage = false;
+                                    });
 
-                                      // Check if this is the last hole
-                                      if (currentHoleIndex == totalHoles - 1) {
-                                        // Show confirmation dialog for last hole
-                                        _showFinalConfirmationDialog(context);
-                                      } else {
-                                        // Go to next hole
-                                        _pageController?.nextPage(
-                                          duration: const Duration(
-                                            milliseconds: 300,
-                                          ),
-                                          curve: Curves.easeInOut,
-                                        );
-                                      }
+                                    // Check if this is the last hole
+                                    if (currentHoleIndex == totalHoles - 1) {
+                                      // Show confirmation dialog for last hole
+                                      _showFinalConfirmationDialog(context);
+                                    } else {
+                                      // Go to next hole
+                                      _pageController?.nextPage(
+                                        duration: const Duration(
+                                          milliseconds: 300,
+                                        ),
+                                        curve: Curves.easeInOut,
+                                      );
                                     }
-                                  });
-                                },
+                                  }
+                                });
+                              },
+                              child: Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFFE1F2D9),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 1,
+                                      spreadRadius: 0,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -530,33 +530,33 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                             ),
                             const SizedBox(width: 20),
                             // Leaderboard button
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFE1F2D9),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 1,
-                                    spreadRadius: 0,
-                                    offset: Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => LeaderboardPage(
-                                        source: 'scoring',
-                                        currentHole: currentHoleIndex,
-                                      ),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => LeaderboardPage(
+                                      source: 'scoring',
+                                      currentHole: currentHoleIndex,
                                     ),
-                                  );
-                                },
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFFE1F2D9),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 1,
+                                      spreadRadius: 0,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -580,43 +580,42 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                             ),
                             const SizedBox(width: 20),
                             // Home button
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFE1F2D9),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 1,
-                                    spreadRadius: 0,
-                                    offset: Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: GestureDetector(
-                                onTap: () async {
-                                  // Disconnect from SignalR if connected
-                                  final signalR = Provider.of<SignalRService>(
-                                    context,
-                                    listen: false,
-                                  );
-                                  await signalR.stopConnection();
+                            GestureDetector(
+                              onTap: () async {
+                                // Disconnect from SignalR if connected
+                                final signalR = Provider.of<SignalRService>(
+                                  context,
+                                  listen: false,
+                                );
+                                await signalR.stopConnection();
 
-                                  // Navigate back to landing page and clear the stack
-                                  if (context.mounted) {
-                                    Navigator.pushAndRemoveUntil(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const LandingPage(),
-                                      ),
-                                      (route) =>
-                                          false, // Remove all previous routes
-                                    );
-                                  }
-                                },
+                                // Navigate back to landing page and clear the stack
+                                if (context.mounted) {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const LandingPage(),
+                                    ),
+                                    (route) =>
+                                        false, // Remove all previous routes
+                                  );
+                                }
+                              },
+                              child: Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFFE1F2D9),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 1,
+                                      spreadRadius: 0,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [

@@ -44,6 +44,11 @@ class SignalRService with ChangeNotifier {
         await stopConnection();
       }
 
+      // Clear existing scores when starting a new connection
+      if (_scoreProvider != null) {
+        _scoreProvider!.clearAllScores();
+      }
+
       String url = '$baseUrl?tournamentId=$tournamentId';
       if (flightId != null) {
         url += '&flightId=$flightId';
@@ -115,6 +120,9 @@ class SignalRService with ChangeNotifier {
 
               // Update the score provider with the saved scores
               if (_scoreProvider != null) {
+                // Clear existing scores before loading new ones
+                _scoreProvider!.clearAllScores();
+
                 savedScores.forEach((playerId, holeScores) {
                   holeScores.forEach((holeId, score) {
                     _scoreProvider!.updateScore(

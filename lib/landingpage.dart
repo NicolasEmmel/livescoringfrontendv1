@@ -159,7 +159,7 @@ class LandingPage extends StatelessWidget {
                                         ).showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              'Verbindungsfehler: ${e.toString()}',
+                                              'Verbindungsfehler: Bitte erneut versuchen',
                                             ),
                                             backgroundColor: Colors.red,
                                             duration: const Duration(

@@ -21,6 +21,7 @@ class LeaderboardEntry {
   final int netto;
   final String tournamentName;
   final String playerId;
+  final int day;
 
   LeaderboardEntry({
     required this.name,
@@ -30,6 +31,7 @@ class LeaderboardEntry {
     required this.netto,
     required this.tournamentName,
     required this.playerId,
+    required this.day,
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,7 @@ class LeaderboardEntry {
       netto: json['netto'],
       tournamentName: json['tournamentName'],
       playerId: json['playerId'],
+      day: json['day'],
     );
   }
 }
