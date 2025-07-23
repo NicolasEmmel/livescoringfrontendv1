@@ -127,46 +127,75 @@ class LandingPage extends StatelessWidget {
                             onTap: signalR.isConnecting
                                 ? null
                                 : () async {
-                                    try {
-                                      // Start SignalR connection with tournament ID 'xxx'
-                                      signalR.setScoreProvider(
-                                        Provider.of<FlightScoreProvider>(
-                                          context,
-                                          listen: false,
-                                        ),
-                                      );
-                                      await signalR.startConnection(
-                                        'xxx',
-                                        flightId: 'xxx',
-                                      );
+                                    const int maxRetries = 3;
+                                    const Duration retryDelay = Duration(
+                                      milliseconds: 500,
+                                    );
 
-                                      // Navigate to leaderboard
-                                      if (context.mounted) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                const LeaderboardPage(
-                                                  source: 'landing',
+                                    // Set connecting state manually for the entire retry process
+                                    signalR.setConnectingState(true);
+
+                                    for (
+                                      int attempt = 1;
+                                      attempt <= maxRetries;
+                                      attempt++
+                                    ) {
+                                      try {
+                                        print(
+                                          "🔄 Connection attempt $attempt of $maxRetries",
+                                        );
+
+                                        // Start SignalR connection with tournament ID 'xxx'
+                                        signalR.setScoreProvider(
+                                          Provider.of<FlightScoreProvider>(
+                                            context,
+                                            listen: false,
+                                          ),
+                                        );
+                                        await signalR.startConnection(
+                                          'xxx', // Only pass tournamentId, no flightId for leaderboard view
+                                        );
+
+                                        // Success! Navigate to leaderboard
+                                        if (context.mounted) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const LeaderboardPage(
+                                                    source: 'landing',
+                                                  ),
+                                            ),
+                                          );
+                                        }
+                                        return; // Exit the retry loop on success
+                                      } catch (e) {
+                                        print(
+                                          "❌ Connection attempt $attempt failed: $e",
+                                        );
+
+                                        if (attempt < maxRetries) {
+                                          // Wait before retrying
+                                          await Future.delayed(retryDelay);
+                                        } else {
+                                          // All retries failed
+                                          signalR.setConnectingState(false);
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Verbindungsfehler nach $maxRetries Versuchen: Bitte erneut versuchen',
                                                 ),
-                                          ),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Verbindungsfehler: Bitte erneut versuchen',
-                                            ),
-                                            backgroundColor: Colors.red,
-                                            duration: const Duration(
-                                              seconds: 3,
-                                            ),
-                                          ),
-                                        );
+                                                backgroundColor: Colors.red,
+                                                duration: const Duration(
+                                                  seconds: 3,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
                                       }
                                     }
                                   },

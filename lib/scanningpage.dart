@@ -32,119 +32,207 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
 
     String testOutput = "";
+    const int maxRetries = 3;
+    const Duration retryDelay = Duration(milliseconds: 500);
 
+    // Step 1: QR Code parsing and decoding
+    Map<String, dynamic> decoded;
     try {
-      final decoded = jsonDecode(rawData);
-      final String scannedFlightId = decoded['flightId'];
-      final String scannedTournamentId = decoded['tournamentId'];
-      final String scannedGolfClubId = decoded['golfClubId'];
-      final String scannedTeeId = decoded['teeId'];
+      decoded = jsonDecode(rawData);
+    } catch (e) {
+      setState(() => errorMessage = 'Ungültiger QR Code: $e');
+      controller.start();
+      setState(() => isProcessing = false);
+      return;
+    }
 
-      String flightBase =
-          //'http://192.168.2.172:5001/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId';
-          "https://golf-livescoring-backend-v1.fly.dev/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId";
+    final String scannedFlightId = decoded['flightId'];
+    final String scannedTournamentId = decoded['tournamentId'];
+    final String scannedGolfClubId = decoded['golfClubId'];
+    final String scannedTeeId = decoded['teeId'];
 
-      final response = await http.get(
-        Uri.parse(flightBase),
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        },
-      );
+    String flightBase =
+        //'http://192.168.2.172:5001/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId';
+        "https://golf-livescoring-backend-v1.fly.dev/api/flights?tournamentId=$scannedTournamentId&flightId=$scannedFlightId";
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-
-        final decoded = jsonDecode(response.body);
-
-        if (decoded is List && decoded.isNotEmpty) {
-          final playersJson = decoded[0]['players'] as List<dynamic>;
-
-          final players = playersJson.map((playerJson) {
-            return Player(
-              id: playerJson['id'] as String,
-              name: playerJson['name'] as String,
-            );
-          }).toList();
-
-          // Set players into the global provider
-          if (context.mounted) {
-            final scoreProvider = Provider.of<FlightScoreProvider>(
-              context,
-              listen: false,
-            );
-            scoreProvider.setFlightPlayers(players);
-          }
-
-          final holesRes = await http.get(
-            Uri.parse(
-              //'http://192.168.2.172:5001/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
-              'https://golf-livescoring-backend-v1.fly.dev/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
-            ),
+    // Step 2: Flight API call with retry mechanism
+    http.Response? response;
+    try {
+      for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          print("🔄 Flight API attempt $attempt of $maxRetries");
+          response = await http.get(
+            Uri.parse(flightBase),
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Pragma': 'no-cache',
               'Expires': '0',
             },
           );
-          if (holesRes.statusCode == 200) {
-            testOutput = holesRes.body;
+          print("✅ Flight API attempt $attempt succeeded");
+          break; // Success, exit retry loop
+        } catch (e) {
+          print("❌ Flight API attempt $attempt failed: $e");
+          if (attempt < maxRetries) {
+            print("⏳ Waiting ${retryDelay.inMilliseconds}ms before retry...");
+            await Future.delayed(retryDelay);
+          } else {
+            throw Exception("Flight API failed after $maxRetries attempts: $e");
+          }
+        }
+      }
+    } catch (e) {
+      setState(() => errorMessage = 'Flight API Fehler: $e');
+      controller.start();
+      setState(() => isProcessing = false);
+      return;
+    }
 
-            final holeList = jsonDecode(holesRes.body) as List;
-            final holes = holeList.map((h) => Hole.fromJson(h)).toList();
+    if (response?.statusCode != 200) {
+      setState(
+        () => errorMessage =
+            'Flight API error: ${response?.statusCode ?? 'Unknown'}',
+      );
+      controller.start();
+      setState(() => isProcessing = false);
+      return;
+    }
 
-            Provider.of<FlightScoreProvider>(
-              context,
-              listen: false,
-            ).setHoles(holes);
+    final List<dynamic> data = jsonDecode(response!.body);
+    final decodedResponse = jsonDecode(response.body);
+
+    if (decodedResponse is List && decodedResponse.isNotEmpty) {
+      final playersJson = decodedResponse[0]['players'] as List<dynamic>;
+
+      final players = playersJson.map((playerJson) {
+        return Player(
+          id: playerJson['id'] as String,
+          name: playerJson['name'] as String,
+        );
+      }).toList();
+
+      // Set players into the global provider
+      if (context.mounted) {
+        final scoreProvider = Provider.of<FlightScoreProvider>(
+          context,
+          listen: false,
+        );
+        scoreProvider.setFlightPlayers(players);
+      }
+
+      // Step 3: Holes API call with retry mechanism
+      http.Response? holesRes;
+      try {
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            print("🔄 Holes API attempt $attempt of $maxRetries");
+            holesRes = await http.get(
+              Uri.parse(
+                //'http://192.168.2.172:5001/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
+                'https://golf-livescoring-backend-v1.fly.dev/api/holes?golfClubId=$scannedGolfClubId&teeId=$scannedTeeId',
+              ),
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+              },
+            );
+            print("✅ Holes API attempt $attempt succeeded");
+            break; // Success, exit retry loop
+          } catch (e) {
+            print("❌ Holes API attempt $attempt failed: $e");
+            if (attempt < maxRetries) {
+              print("⏳ Waiting ${retryDelay.inMilliseconds}ms before retry...");
+              await Future.delayed(retryDelay);
+            } else {
+              throw Exception(
+                "Holes API failed after $maxRetries attempts: $e",
+              );
+            }
+          }
+        }
+      } catch (e) {
+        setState(() => errorMessage = 'Holes API Fehler: $e');
+        controller.start();
+        setState(() => isProcessing = false);
+        return;
+      }
+
+      if (holesRes?.statusCode == 200) {
+        testOutput = holesRes!.body;
+
+        final holeList = jsonDecode(holesRes.body) as List;
+        final holes = holeList.map((h) => Hole.fromJson(h)).toList();
+
+        Provider.of<FlightScoreProvider>(
+          context,
+          listen: false,
+        ).setHoles(holes);
+      }
+    }
+
+    final flight = data.firstWhere(
+      (f) => f['id'] == scannedFlightId,
+      orElse: () => null,
+    );
+
+    if (flight != null) {
+      // TournamentId match (if flight also contains tournamentId)
+      // If not in the API response, skip this check or adapt it
+
+      Provider.of<FlightScoreProvider>(
+        context,
+        listen: false,
+      ).setTournamentId(scannedTournamentId);
+
+      // Step 4: SignalR connection with retry mechanism
+      try {
+        final signalR = Provider.of<SignalRService>(context, listen: false);
+        signalR.setScoreProvider(
+          Provider.of<FlightScoreProvider>(context, listen: false),
+        );
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            print("🔄 SignalR connection attempt $attempt of $maxRetries");
+            await signalR.startConnection(
+              scannedTournamentId,
+              flightId: scannedFlightId,
+            );
+            print("✅ SignalR connection attempt $attempt succeeded");
+            break; // Success, exit retry loop
+          } catch (e) {
+            print("❌ SignalR connection attempt $attempt failed: $e");
+            if (attempt < maxRetries) {
+              print("⏳ Waiting ${retryDelay.inMilliseconds}ms before retry...");
+              await Future.delayed(retryDelay);
+            } else {
+              throw Exception(
+                "SignalR connection failed after $maxRetries attempts: $e",
+              );
+            }
           }
         }
 
-        final flight = data.firstWhere(
-          (f) => f['id'] == scannedFlightId,
-          orElse: () => null,
+        // Success: navigate to scoring
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ScoreManagementPage()),
         );
-
-        if (flight != null) {
-          // TournamentId match (if flight also contains tournamentId)
-          // If not in the API response, skip this check or adapt it
-
-          Provider.of<FlightScoreProvider>(
-            context,
-            listen: false,
-          ).setTournamentId(scannedTournamentId);
-
-          final signalR = Provider.of<SignalRService>(context, listen: false);
-          signalR.setScoreProvider(
-            Provider.of<FlightScoreProvider>(context, listen: false),
-          );
-          await signalR.startConnection(
-            scannedTournamentId,
-            flightId: scannedFlightId,
-          );
-
-          //  Success: navigate to scoring
-          if (!mounted) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => ScoreManagementPage()),
-          );
-          return;
-        } else {
-          setState(() => errorMessage = 'Flight konntenicht gefunden werden');
-        }
-      } else {
-        setState(() => errorMessage = 'API error: ${response.statusCode}');
+        return;
+      } catch (e) {
+        setState(() => errorMessage = 'SignalR Verbindungsfehler: $e');
+        controller.start();
+        setState(() => isProcessing = false);
+        return;
       }
-    } catch (e) {
-      setState(
-        () => errorMessage = 'Fehler beim Scannen, bitte erneut versuchen',
-      );
+    } else {
+      setState(() => errorMessage = 'Flight konntenicht gefunden werden');
+      controller.start();
+      setState(() => isProcessing = false);
+      return;
     }
-
-    controller.start();
-    setState(() => isProcessing = false);
   }
 
   @override

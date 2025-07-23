@@ -142,8 +142,8 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
           ),
           content: Text(
             allScored
-                ? 'All scores have been submitted successfully. Would you like to view the complete scores summary?'
-                : 'Some holes may not have scores recorded. Would you like to view the current scores summary anyway?',
+                ? 'Alle Scores wurden erfolgreich gesendet. Möchtest du die vollständige Scoreübersicht ansehen?'
+                : 'ES FEHLEN NOCH SCORES. Möchtest du trotzdem die aktuelle Scoreübersicht ansehen?',
             style: const TextStyle(fontSize: 16),
           ),
           actions: [
@@ -280,7 +280,7 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
                                             ),
                                           ),
                                           child: const Text(
-                                            'FINAL HOLE',
+                                            'FINALES LOCH',
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,

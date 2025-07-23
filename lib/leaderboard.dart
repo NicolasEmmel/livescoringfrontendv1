@@ -102,8 +102,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                           signalR.clearError();
                           try {
                             await signalR.startConnection(
-                              'xxx',
-                              flightId: 'xxx',
+                              'xxx', // Only pass tournamentId, no flightId for leaderboard view
                             );
                           } catch (e) {
                             if (context.mounted) {
@@ -319,7 +318,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                                   Expanded(
                                     flex: 1,
                                     child: Text(
-                                      'TOTAL',
+                                      'ALL',
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,

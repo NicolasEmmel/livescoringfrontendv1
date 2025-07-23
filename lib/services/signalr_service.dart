@@ -24,6 +24,11 @@ class SignalRService with ChangeNotifier {
     notifyListeners();
   }
 
+  void setConnectingState(bool isConnecting) {
+    _isConnecting = isConnecting;
+    notifyListeners();
+  }
+
   final String baseUrl =
       //'http://192.168.2.172:5001/scorehub';
       'https://golf-livescoring-backend-v1.fly.dev/scorehub';
@@ -42,6 +47,8 @@ class SignalRService with ChangeNotifier {
       // If there's already a connection, stop it first
       if (_hubConnection != null) {
         await stopConnection();
+        // Small delay to ensure connection is fully cleaned up
+        await Future.delayed(const Duration(milliseconds: 100));
       }
 
       // Clear existing scores when starting a new connection
@@ -187,10 +194,15 @@ class SignalRService with ChangeNotifier {
   }
 
   Future<void> stopConnection() async {
-    if (_hubConnection != null &&
-        _hubConnection!.state == HubConnectionState.Connected) {
-      await _hubConnection!.stop();
-      print("🔌 SignalR disconnected.");
+    if (_hubConnection != null) {
+      print("🔌 Stopping SignalR connection (state: ${_hubConnection!.state})");
+      try {
+        if (_hubConnection!.state == HubConnectionState.Connected) {
+          await _hubConnection!.stop();
+        }
+      } catch (e) {
+        print("⚠️ Error stopping connection: $e");
+      }
       _isConnected = false;
       _isConnecting = false;
       _connectionError = null;
