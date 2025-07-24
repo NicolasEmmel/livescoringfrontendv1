@@ -66708,7 +66708,7 @@ A.Y1.prototype={
 $1(a){return B.DO},
 $S:175}
 A.kR.prototype={
-an(){return new A.LJ(A.c(["Male","Female","Youth","Senior"],t.s))}}
+an(){return new A.LJ(A.c(["Male","Senior"],t.s))}}
 A.LJ.prototype={
 O(a){var s,r,q,p,o,n=this,m=null,l=A.d7(a,!0,t.A).e,k=A.d7(a,!0,t.GF),j=l.a,i=n.Yd(j)
 n.a_D(j)
@@ -66728,8 +66728,6 @@ p=n.a.c==="landing"
 o=A.aj3(p?B.lI:B.lL,B.k,m,24)
 j=A.cL(A.c([j,s,B.LB,B.x1,q,new A.bI(B.bE,A.je(A.jo(m,A.bW(A.cL(A.c([o,B.cM,A.bN(p?"Home":"Score",m,B.dX,m)],r),B.u,B.a4,B.w),m,new A.bO(B.aW,m,m,m,B.bY,m,B.bB),80,m,m,80),B.ai,!1,m,m,m,m,m,m,m,m,m,m,m,m,m,new A.acE(n,a),m,m,m,m,m,m),m,m),m)],r),B.u,B.P,B.w)}}return A.HC(m,A.bW(A.nL(!0,j,!0),m,B.e6,1/0,m,m,1/0))},
 Yw(a){switch(a){case"Male":return"Herren"
-case"Female":return"Damen"
-case"Youth":return"Jugend"
 case"Senior":return"Senior"
 default:return a}},
 Y6(){var s,r,q,p=this.c
