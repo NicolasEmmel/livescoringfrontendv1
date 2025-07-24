@@ -19,7 +19,7 @@ class LeaderboardPage extends StatefulWidget {
 class _LeaderboardPageState extends State<LeaderboardPage> {
   String selectedTournament = 'Male'; // Default to Male tournament
 
-  final List<String> tournaments = ['Male', 'Female', 'Youth', 'Senior'];
+  final List<String> tournaments = ['Male', 'Senior'];
 
   @override
   Widget build(BuildContext context) {
@@ -586,10 +586,6 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
     switch (tournament) {
       case 'Male':
         return 'Herren';
-      case 'Female':
-        return 'Damen';
-      case 'Youth':
-        return 'Jugend';
       case 'Senior':
         return 'Senior';
       default:
