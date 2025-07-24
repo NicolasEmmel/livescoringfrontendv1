@@ -639,8 +639,12 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
         .where((e) => e.day == latestDay)
         .toList();
 
-    // Sort by today's score
-    todayEntries.sort((a, b) => a.toPar.compareTo(b.toPar));
+    // Sort by total score
+    todayEntries.sort((a, b) {
+      final totalScoreA = _getTotalScoreValue(a);
+      final totalScoreB = _getTotalScoreValue(b);
+      return totalScoreA.compareTo(totalScoreB);
+    });
 
     return todayEntries;
   }
