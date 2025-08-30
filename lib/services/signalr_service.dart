@@ -223,6 +223,66 @@ class SignalRService with ChangeNotifier {
         }
       });
 
+      // Listener for receiving score updates from the backend
+      _hubConnection!.on("ReceiveRyderCupUpdate", (List<Object?>? arguments) {
+        print("📨 Received Ryder Cup score update: $arguments");
+
+        if (arguments != null && arguments.isNotEmpty) {
+          final data = arguments[0];
+
+          if (data is List<dynamic>) {
+            try {
+              // Parse the updated games
+              final List<Game> updatedGames = data.map((gameData) {
+                if (gameData is Map<String, dynamic>) {
+                  return Game.fromJson(gameData);
+                } else {
+                  throw FormatException('Invalid game data format: $gameData');
+                }
+              }).toList();
+
+              print("✅ Parsed ${updatedGames.length} updated Ryder Cup games");
+
+              // Update the existing games with new scores
+              if (_gameProvider != null) {
+                // Update each game individually to preserve existing state
+                for (final updatedGame in updatedGames) {
+                  final existingGame = _gameProvider!.getGameById(
+                    updatedGame.id,
+                  );
+                  if (existingGame != null) {
+                    // Update the existing game with new scores
+                    _gameProvider!.updateGameScore(
+                      updatedGame.id,
+                      updatedGame.points1,
+                      updatedGame.points2,
+                    );
+                    print(
+                      "🔄 Updated game ${updatedGame.id}: ${updatedGame.points1}-${updatedGame.points2}",
+                    );
+                  } else {
+                    // If game doesn't exist, add it
+                    print(
+                      "➕ Adding new game ${updatedGame.id}: ${updatedGame.points1}-${updatedGame.points2}",
+                    );
+                    _gameProvider!.setGames([
+                      ..._gameProvider!.games,
+                      updatedGame,
+                    ]);
+                  }
+                }
+                print("✅ Updated game provider with score updates");
+              }
+              notifyListeners();
+            } catch (e) {
+              print("❌ Failed to parse Ryder Cup score update: $e");
+            }
+          } else {
+            print("⚠️ Invalid Ryder Cup score update data format: $data");
+          }
+        }
+      });
+
       _hubConnection!.on("TestMessage", (arguments) {
         print("📨 Message received: $arguments");
       });
