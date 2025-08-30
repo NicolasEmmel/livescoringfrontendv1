@@ -266,15 +266,31 @@ class _LandingPageState extends State<LandingPage> {
                                         );
                                         await signalR.startConnection();
 
+                                        // Wait a moment for connection to fully establish
+                                        await Future.delayed(
+                                          const Duration(milliseconds: 500),
+                                        );
+
                                         // Success! Navigate to leaderboard
                                         print(
                                           "✅ SignalR connected, navigating to leaderboard...",
                                         );
 
+                                        // Reset connecting state before navigation
+                                        signalR.setConnectingState(false);
+
                                         if (context.mounted) {
+                                          print(
+                                            "🚀 Navigating to leaderboard...",
+                                          );
                                           Navigator.pushNamed(
                                             context,
                                             '/leaderboard',
+                                          );
+                                          print("✅ Navigation completed");
+                                        } else {
+                                          print(
+                                            "❌ Context not mounted, cannot navigate",
                                           );
                                         }
                                         return; // Exit the retry loop on success
