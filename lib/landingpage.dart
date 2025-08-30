@@ -1,12 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:livescoringfrontendv1/scanningpage.dart';
-import 'package:livescoringfrontendv1/leaderboard.dart';
+import 'package:livescoringfrontendv1/ryder_cup_games_page.dart';
 import '../providers/flight_score_provider.dart';
+import '../providers/game_provider.dart';
 import 'services/signalr_service.dart';
 
-class LandingPage extends StatelessWidget {
+class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
+
+  @override
+  State<LandingPage> createState() => _LandingPageState();
+}
+
+class _LandingPageState extends State<LandingPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Set up navigation callback for when games are received
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final signalR = Provider.of<SignalRService>(context, listen: false);
+      signalR.setNavigationCallback((games) {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const RyderCupGamesPage()),
+          );
+        }
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +53,7 @@ class LandingPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 40),
                 const Text(
-                  'Clubmeisterschaften GC Kitzingen',
+                  'Ryder-Cup 2025',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 32,
@@ -40,64 +62,6 @@ class LandingPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 60),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 8,
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: const Color.fromARGB(80, 255, 255, 255),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 1,
-                          spreadRadius: 2,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => QRScannerPage(),
-                            ),
-                          );
-                        },
-                        child: const Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.qr_code_scanner,
-                                color: Color(0xFF2E7D32),
-                                size: 28,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'Scanne Flight QR Code',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2E7D32),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
@@ -145,29 +109,25 @@ class LandingPage extends StatelessWidget {
                                           "🔄 Connection attempt $attempt of $maxRetries",
                                         );
 
-                                        // Start SignalR connection with tournament ID 'xxx'
+                                        // Start SignalR connection
                                         signalR.setScoreProvider(
                                           Provider.of<FlightScoreProvider>(
                                             context,
                                             listen: false,
                                           ),
                                         );
-                                        await signalR.startConnection(
-                                          'xxx', // Only pass tournamentId, no flightId for leaderboard view
-                                        );
-
-                                        // Success! Navigate to leaderboard
-                                        if (context.mounted) {
-                                          Navigator.push(
+                                        signalR.setGameProvider(
+                                          Provider.of<GameProvider>(
                                             context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const LeaderboardPage(
-                                                    source: 'landing',
-                                                  ),
-                                            ),
-                                          );
-                                        }
+                                            listen: false,
+                                          ),
+                                        );
+                                        await signalR.startConnection();
+
+                                        // Success! The navigation will happen automatically when games are received
+                                        print(
+                                          "✅ SignalR connected, waiting for games...",
+                                        );
                                         return; // Exit the retry loop on success
                                       } catch (e) {
                                         print(
@@ -217,7 +177,7 @@ class LandingPage extends StatelessWidget {
                                     )
                                   else
                                     const Icon(
-                                      Icons.leaderboard,
+                                      Icons.qr_code_scanner,
                                       color: Color(0xFF2E7D32),
                                       size: 28,
                                     ),
@@ -225,7 +185,7 @@ class LandingPage extends StatelessWidget {
                                   Text(
                                     signalR.isConnecting
                                         ? 'Verbinde...'
-                                        : 'Leaderboard ansehen',
+                                        : 'Flightauswahl',
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w600,
@@ -237,6 +197,61 @@ class LandingPage extends StatelessWidget {
                             ),
                           );
                         },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Leaderboard Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 8,
+                  ),
+                  child: Container(
+                    width: double.infinity,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(80, 255, 255, 255),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 1,
+                          spreadRadius: 2,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          Navigator.pushNamed(context, '/leaderboard');
+                        },
+                        child: const Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.leaderboard,
+                                color: Color(0xFF2E7D32),
+                                size: 28,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Leaderboard anzeigen',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),

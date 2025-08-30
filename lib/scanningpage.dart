@@ -195,10 +195,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
           try {
             print("🔄 SignalR connection attempt $attempt of $maxRetries");
-            await signalR.startConnection(
-              scannedTournamentId,
-              flightId: scannedFlightId,
-            );
+            await signalR.startConnection();
             print("✅ SignalR connection attempt $attempt succeeded");
             break; // Success, exit retry loop
           } catch (e) {

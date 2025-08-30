@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:livescoringfrontendv1/models/leaderboard.dart';
+import 'package:livescoringfrontendv1/models/game.dart';
 import 'package:provider/provider.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
 import '../providers/flight_score_provider.dart';
+import '../providers/game_provider.dart';
 
 class SignalRService with ChangeNotifier {
   HubConnection? _hubConnection;
@@ -14,9 +17,53 @@ class SignalRService with ChangeNotifier {
   String? _connectionError;
 
   FlightScoreProvider? _scoreProvider;
+  GameProvider? _gameProvider;
+
+  // Navigation callback for when games are received
+  Function(List<Game>)? _navigationCallback;
 
   void setScoreProvider(FlightScoreProvider provider) {
     _scoreProvider = provider;
+  }
+
+  void setGameProvider(GameProvider provider) {
+    _gameProvider = provider;
+  }
+
+  void setNavigationCallback(Function(List<Game>) callback) {
+    _navigationCallback = callback;
+  }
+
+  List<Game> get ryderCupGames => _gameProvider?.games ?? [];
+
+  // Get current connection state
+  String get connectionState {
+    if (_hubConnection == null) return 'Not initialized';
+    switch (_hubConnection!.state) {
+      case HubConnectionState.Disconnected:
+        return 'Disconnected';
+      case HubConnectionState.Connecting:
+        return 'Connecting';
+      case HubConnectionState.Connected:
+        return 'Connected';
+      case HubConnectionState.Reconnecting:
+        return 'Reconnecting';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  // Get detailed connection info
+  Map<String, dynamic> get connectionInfo {
+    return {
+      'isConnected': _isConnected,
+      'isConnecting': _isConnecting,
+      'connectionState': connectionState,
+      'connectionError': _connectionError,
+      'hubConnectionState': _hubConnection?.state.toString(),
+      'connectionId': _hubConnection?.connectionId,
+      'baseUrl': baseUrl,
+    };
   }
 
   void clearError() {
@@ -24,28 +71,61 @@ class SignalRService with ChangeNotifier {
     notifyListeners();
   }
 
+  // Check connection health and diagnose issues
+  void diagnoseConnection() {
+    print("🔍 === CONNECTION DIAGNOSIS ===");
+    print("📊 Connection Info: $connectionInfo");
+
+    if (_hubConnection != null) {
+      print("🔗 Hub Connection State: ${_hubConnection!.state}");
+      print("🆔 Connection ID: ${_hubConnection!.connectionId}");
+      print("🌐 Base URL: $baseUrl");
+    } else {
+      print("❌ No Hub Connection available");
+    }
+
+    if (_connectionError != null) {
+      print("❌ Last Error: $_connectionError");
+    }
+
+    print(
+      "📡 Score Provider: ${_scoreProvider != null ? 'Available' : 'Not set'}",
+    );
+    print(
+      "🧭 Navigation Callback: ${_navigationCallback != null ? 'Set' : 'Not set'}",
+    );
+    print(
+      "🎮 Ryder Cup Games: ${_gameProvider?.games.length ?? 0} games loaded",
+    );
+    print("🔍 === END DIAGNOSIS ===");
+  }
+
   void setConnectingState(bool isConnecting) {
     _isConnecting = isConnecting;
     notifyListeners();
   }
 
-  final String baseUrl =
-      //'http://192.168.2.172:5001/scorehub';
-      'https://golf-livescoring-backend-v1.fly.dev/scorehub';
+  final String baseUrl = 'https://golf-livescoring-backend-v1.fly.dev/scorehub';
+  //'http://192.168.2.172:5001/scorehub';
+  //'http://localhost:5001/scorehub';
 
   bool get isConnected => _isConnected;
   bool get isConnecting => _isConnecting;
   String? get connectionError => _connectionError;
 
-  Future<void> startConnection(String tournamentId, {String? flightId}) async {
+  Future<void> startConnection() async {
     // Reset error state
     _connectionError = null;
     _isConnecting = true;
     notifyListeners();
 
     try {
+      print("🚀 Starting SignalR connection...");
+      print("📍 Base URL: $baseUrl");
+
       // If there's already a connection, stop it first
       if (_hubConnection != null) {
+        print("🔄 Stopping existing connection...");
         await stopConnection();
         // Small delay to ensure connection is fully cleaned up
         await Future.delayed(const Duration(milliseconds: 100));
@@ -56,19 +136,25 @@ class SignalRService with ChangeNotifier {
         _scoreProvider!.clearAllScores();
       }
 
-      String url = '$baseUrl?tournamentId=$tournamentId';
-      if (flightId != null) {
-        url += '&flightId=$flightId';
-      }
+      print("🔗 Full connection URL: $baseUrl");
+
+      // Skip connectivity test for live backend
+      print("🚀 Proceeding with SignalR connection to live backend...");
 
       final httpOptions = HttpConnectionOptions(
         transport: HttpTransportType.WebSockets,
       );
 
+      print("🔧 Building HubConnection...");
       _hubConnection = HubConnectionBuilder()
-          .withUrl(url, options: httpOptions)
+          .withUrl(baseUrl, options: httpOptions)
           .withAutomaticReconnect()
           .build();
+
+      print("🔍 HubConnection built, checking initial state...");
+      print("🔍 Initial connection state: ${_hubConnection!.state}");
+
+      print("📡 Setting up message listeners...");
 
       // Example listener
       _hubConnection!.on("ReceiveScoreUpdate", (List<Object?>? arguments) {
@@ -90,6 +176,49 @@ class SignalRService with ChangeNotifier {
             }
           } else {
             print("⚠️ Invalid leaderboard data format: $data");
+          }
+        }
+      });
+
+      // Listener for receiving Ryder Cup games from the backend
+      _hubConnection!.on("ReceiveRyderCupScores", (List<Object?>? arguments) {
+        print("📨 Received Ryder Cup games: $arguments");
+
+        if (arguments != null && arguments.isNotEmpty) {
+          final data = arguments[0];
+
+          if (data is List) {
+            try {
+              final List<Game> games = data.map((gameData) {
+                if (gameData is Map<String, dynamic>) {
+                  return Game.fromJson(gameData);
+                } else {
+                  throw Exception("Invalid game data format");
+                }
+              }).toList();
+
+              print("✅ Parsed ${games.length} Ryder Cup games");
+
+              // Store the games in the game provider
+              if (_gameProvider != null) {
+                _gameProvider!.setGames(games);
+              }
+              notifyListeners();
+
+              // Navigate to the games page if we have a navigation context
+              if (_navigationCallback != null) {
+                print(
+                  "🧭 Calling navigation callback with ${games.length} games",
+                );
+                _navigationCallback!(games);
+              } else {
+                print("⚠️ No navigation callback set");
+              }
+            } catch (e) {
+              print("❌ Failed to parse Ryder Cup games: $e");
+            }
+          } else {
+            print("⚠️ Invalid Ryder Cup games data format: $data");
           }
         }
       });
@@ -152,39 +281,85 @@ class SignalRService with ChangeNotifier {
       });
 
       _hubConnection!.onclose(({error}) {
-        print("Connection closed");
+        print("🔌 Connection closed");
+        if (error != null) {
+          print("❌ Connection error: $error");
+          _connectionError = "Connection closed: ${error.toString()}";
+        } else {
+          print("ℹ️ Connection closed without error (possibly by backend)");
+          _connectionError = "Connection closed by server";
+        }
         _isConnected = false;
         notifyListeners();
       });
 
       _hubConnection!.onreconnecting(({error}) {
         _isConnected = false;
-        print("🔄 Reconnecting to SignalR...");
+        print("🔄 Reconnecting to SignalR... State: ${_hubConnection!.state}");
+        if (error != null) {
+          print("❌ Reconnection error: $error");
+          _connectionError = "Reconnecting: ${error.toString()}";
+        }
         notifyListeners();
       });
 
       _hubConnection!.onreconnected(({connectionId}) {
         _isConnected = true;
+        _connectionError = null;
+        print("✅ Reconnected to SignalR. Connection ID: $connectionId");
         notifyListeners();
       });
 
+      print("🚀 Starting connection...");
+      print("🔍 Pre-connection state check:");
+      print(
+        "   - HubConnection: ${_hubConnection != null ? 'Built' : 'Not built'}",
+      );
+      print("   - Connection state: ${_hubConnection?.state}");
+      print("   - Base URL: $baseUrl");
+
       final connectionFuture = _hubConnection!.start();
       if (connectionFuture != null) {
+        print("⏱️ Waiting for connection with 15 second timeout...");
+        print("🔍 Connection future type: ${connectionFuture.runtimeType}");
+
         await connectionFuture.timeout(
-          const Duration(seconds: 10),
+          const Duration(seconds: 15),
           onTimeout: () {
-            throw Exception("Connection timeout after 10 seconds");
+            print("⏰ Connection timeout after 15 seconds");
+            print("🔍 Final connection state: ${_hubConnection?.state}");
+            throw Exception("Connection timeout after 15 seconds");
           },
         );
       } else {
-        throw Exception("Failed to start connection");
+        print("❌ Connection future is null");
+        throw Exception(
+          "Failed to start connection - connection future is null",
+        );
       }
-      print("✅ SignalR connected.");
+      print("✅ SignalR connected successfully!");
+      print("🔗 Connection state: ${_hubConnection!.state}");
+      print("🆔 Connection ID: ${_hubConnection!.connectionId}");
       _isConnected = true;
       _isConnecting = false;
       notifyListeners();
     } catch (e) {
       print("❌ SignalR connection error: $e");
+      print("🔍 Error type: ${e.runtimeType}");
+      print("🔍 Error details: ${e.toString()}");
+
+      // Check if there's a connection that needs cleanup
+      if (_hubConnection != null) {
+        print(
+          "🔍 Final connection state before cleanup: ${_hubConnection!.state}",
+        );
+        try {
+          await _hubConnection!.stop();
+        } catch (stopError) {
+          print("⚠️ Error stopping connection during cleanup: $stopError");
+        }
+      }
+
       _isConnected = false;
       _isConnecting = false;
       _connectionError = "Connection failed: ${e.toString()}";
@@ -221,12 +396,39 @@ class SignalRService with ChangeNotifier {
         await _hubConnection!.invoke(method, args: args);
         print("📤 Sent message: $method => $args");
         return;
-      } catch (e, stack) {
+      } catch (e) {
         print('stack: $e');
         await Future.delayed(const Duration(milliseconds: 300));
       }
     } else {
       await Future.delayed(const Duration(milliseconds: 300));
+    }
+  }
+
+  Future<void> sendGameScoreUpdate(int points1, int points2, int gameId) async {
+    const method = 'SendScoreUpdate';
+
+    if (_hubConnection != null &&
+        _hubConnection!.state == HubConnectionState.Connected) {
+      try {
+        print(
+          '📡 Sending game score update: Team1=$points1, Team2=$points2, GameID=$gameId',
+        );
+        await _hubConnection!.invoke(method, args: [points1, points2, gameId]);
+        print(
+          "📤 Sent game score update: $method => [$points1, $points2, $gameId]",
+        );
+
+        // Update local game state
+        if (_gameProvider != null) {
+          _gameProvider!.updateGameScore(gameId, points1, points2);
+        }
+      } catch (e) {
+        print('❌ Error sending game score update: $e');
+        rethrow;
+      }
+    } else {
+      throw Exception('SignalR connection not available');
     }
   }
 
@@ -252,5 +454,27 @@ class SignalRService with ChangeNotifier {
 
   void unregisterHandler(String method) {
     _hubConnection?.off(method);
+  }
+
+  // Test basic connectivity to the backend
+  Future<bool> testBackendConnectivity() async {
+    try {
+      print("🧪 Testing backend connectivity to: $baseUrl");
+
+      // Try to make a simple HTTP request to the base domain to see if the backend is reachable
+      final baseDomain = baseUrl.replaceAll('/scorehub', '');
+      print("🧪 Testing base domain: $baseDomain");
+
+      final response = await http
+          .get(Uri.parse(baseDomain))
+          .timeout(const Duration(seconds: 5));
+
+      print("✅ Backend connectivity test successful: ${response.statusCode}");
+      // Accept any 2xx or 3xx status code as successful
+      return response.statusCode >= 200 && response.statusCode < 400;
+    } catch (e) {
+      print("❌ Backend connectivity test failed: $e");
+      return false;
+    }
   }
 }

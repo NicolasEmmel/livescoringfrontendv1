@@ -27,8 +27,8 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
     final signalR = Provider.of<SignalRService>(context);
 
     // Filter and process leaderboard entries
-    final filteredEntries = _getFilteredEntries(leaderboard?.entries ?? []);
-    final hasMultipleDays = _hasMultipleDays(leaderboard?.entries ?? []);
+    final filteredEntries = _getFilteredEntries(leaderboard.entries ?? []);
+    final hasMultipleDays = _hasMultipleDays(leaderboard.entries ?? []);
 
     return Scaffold(
       body: Container(
@@ -101,9 +101,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                         onPressed: () async {
                           signalR.clearError();
                           try {
-                            await signalR.startConnection(
-                              'xxx', // Only pass tournamentId, no flightId for leaderboard view
-                            );
+                            await signalR.startConnection();
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -598,7 +596,6 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
       context,
       listen: false,
     ).leaderboard;
-    if (leaderboard == null) return 1;
 
     final tournamentEntries = leaderboard.entries
         .where((entry) => entry.tournamentName == selectedTournament)
@@ -667,7 +664,6 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
       context,
       listen: false,
     ).leaderboard;
-    if (leaderboard == null) return entry.toPar;
 
     // Get all entries for this player in the selected tournament
     final playerEntries = leaderboard.entries

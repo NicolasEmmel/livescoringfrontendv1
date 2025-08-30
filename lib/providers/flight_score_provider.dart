@@ -2,10 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:livescoringfrontendv1/models/leaderboard.dart';
 import 'package:livescoringfrontendv1/services/signalr_service.dart';
-import 'package:signalr_netcore/hub_connection.dart';
 import '../models/player.dart';
 import '../models/hole.dart';
-import 'dart:collection';
 
 class FlightScoreProvider with ChangeNotifier {
   final Map<String, Map<String, int>> _scores = {};

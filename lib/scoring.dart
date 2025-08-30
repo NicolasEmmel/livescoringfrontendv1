@@ -186,9 +186,7 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
     final holes = Provider.of<FlightScoreProvider>(context).holes;
 
     // Initialize controller if null
-    if (_pageController == null) {
-      _pageController = PageController(initialPage: currentHoleIndex);
-    }
+    _pageController ??= PageController(initialPage: currentHoleIndex);
 
     if (holes.isEmpty) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
