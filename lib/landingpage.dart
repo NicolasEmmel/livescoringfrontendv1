@@ -226,32 +226,126 @@ class _LandingPageState extends State<LandingPage> {
                     ),
                     child: Material(
                       color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () {
-                          Navigator.pushNamed(context, '/leaderboard');
+                      child: Consumer<SignalRService>(
+                        builder: (context, signalR, child) {
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: signalR.isConnecting
+                                ? null
+                                : () async {
+                                    const int maxRetries = 3;
+                                    const Duration retryDelay = Duration(
+                                      milliseconds: 500,
+                                    );
+
+                                    // Set connecting state manually for the entire retry process
+                                    signalR.setConnectingState(true);
+
+                                    for (
+                                      int attempt = 1;
+                                      attempt <= maxRetries;
+                                      attempt++
+                                    ) {
+                                      try {
+                                        print(
+                                          "🔄 Connection attempt $attempt of $maxRetries",
+                                        );
+
+                                        // Start SignalR connection
+                                        signalR.setScoreProvider(
+                                          Provider.of<FlightScoreProvider>(
+                                            context,
+                                            listen: false,
+                                          ),
+                                        );
+                                        signalR.setGameProvider(
+                                          Provider.of<GameProvider>(
+                                            context,
+                                            listen: false,
+                                          ),
+                                        );
+                                        await signalR.startConnection();
+
+                                        // Success! Navigate to leaderboard
+                                        print(
+                                          "✅ SignalR connected, navigating to leaderboard...",
+                                        );
+
+                                        if (context.mounted) {
+                                          Navigator.pushNamed(
+                                            context,
+                                            '/leaderboard',
+                                          );
+                                        }
+                                        return; // Exit the retry loop on success
+                                      } catch (e) {
+                                        print(
+                                          "❌ Connection attempt $attempt failed: $e",
+                                        );
+
+                                        if (attempt < maxRetries) {
+                                          // Wait before retrying
+                                          await Future.delayed(retryDelay);
+                                        } else {
+                                          // All retries failed
+                                          signalR.setConnectingState(false);
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Verbindungsfehler nach $maxRetries Versuchen: Bitte erneut versuchen',
+                                                ),
+                                                backgroundColor: Colors.red,
+                                                duration: const Duration(
+                                                  seconds: 3,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (signalR.isConnecting)
+                                    const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Color(0xFF2E7D32),
+                                            ),
+                                      ),
+                                    )
+                                  else
+                                    const Icon(
+                                      Icons.leaderboard,
+                                      color: Color(0xFF2E7D32),
+                                      size: 28,
+                                    ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    signalR.isConnecting
+                                        ? 'Verbinde...'
+                                        : 'Leaderboard anzeigen',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
                         },
-                        child: const Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.leaderboard,
-                                color: Color(0xFF2E7D32),
-                                size: 28,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'Leaderboard anzeigen',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2E7D32),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ),
