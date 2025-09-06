@@ -288,7 +288,7 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
             final playerId = player['id'];
             final playerName = player['name'];
 
-            // Include all scores from the current game data
+            // Include only holes that have been genuinely played
             List<MulliganHoleScore> playedScores = [];
             for (int holeIndex = 0; holeIndex < totalHoles; holeIndex++) {
               // Get the score data (prioritizes user input, falls back to game data)
@@ -297,8 +297,19 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
               final mulligan = _getMulliganCheckbox(playerId, holeIndex);
               final lady = _getLadyCheckbox(playerId, holeIndex);
 
-              // Only include holes that have been played (score > 0 or any other data)
-              if (score > 0 || putts > 0 || mulligan || lady) {
+              // Check if this hole has been genuinely played by the user
+              final hasUserInput = _hasUserInput(playerId, holeIndex, context);
+              final hasGameData = _hasGameData(playerId, holeIndex, context);
+              final parValue = _dummyHoles[holeIndex]['par'] as int;
+
+              // Only include holes that have been genuinely played
+              // (user input, game data, or any non-default values)
+              if (hasUserInput ||
+                  hasGameData ||
+                  putts > 0 ||
+                  mulligan ||
+                  lady ||
+                  (score != parValue)) {
                 playedScores.add(
                   MulliganHoleScore(
                     holeNumber: holeIndex + 1,
@@ -326,7 +337,7 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
         final updatedPlayers = currentGame.players.map((player) {
           final playerId = player.id.toString();
 
-          // Include all scores from the current game data
+          // Include only holes that have been genuinely played
           List<MulliganHoleScore> playedScores = [];
           for (int holeIndex = 0; holeIndex < totalHoles; holeIndex++) {
             // Get the score data (prioritizes user input, falls back to game data)
@@ -335,8 +346,19 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
             final mulligan = _getMulliganCheckbox(playerId, holeIndex);
             final lady = _getLadyCheckbox(playerId, holeIndex);
 
-            // Only include holes that have been played (score > 0 or any other data)
-            if (score > 0 || putts > 0 || mulligan || lady) {
+            // Check if this hole has been genuinely played by the user
+            final hasUserInput = _hasUserInput(playerId, holeIndex, context);
+            final hasGameData = _hasGameData(playerId, holeIndex, context);
+            final parValue = _dummyHoles[holeIndex]['par'] as int;
+
+            // Only include holes that have been genuinely played
+            // (user input, game data, or any non-default values)
+            if (hasUserInput ||
+                hasGameData ||
+                putts > 0 ||
+                mulligan ||
+                lady ||
+                (score != parValue)) {
               playedScores.add(
                 MulliganHoleScore(
                   holeNumber: holeIndex + 1,
@@ -419,11 +441,75 @@ class _ScoreManagementPageState extends State<ScoreManagementPage> {
         ),
       );
 
-      return holeScore.strokes;
+      // If player has a score in game data, return it
+      if (holeScore.strokes > 0) {
+        return holeScore.strokes;
+      }
     }
 
-    // Return default score if no data available
-    return 0;
+    // If no data exists, pre-fill with par value for this hole
+    final hole = _dummyHoles[holeIndex];
+    return hole['par'] as int;
+  }
+
+  bool _hasUserInput(String playerId, int holeIndex, BuildContext context) {
+    final mulliganCupProvider = Provider.of<MulliganCupProvider>(
+      context,
+      listen: false,
+    );
+
+    // Check if user has manually set any values for this hole
+    return mulliganCupProvider.scores.containsKey('${playerId}_$holeIndex') ||
+        mulliganCupProvider.puttsCounters.containsKey(
+          '${playerId}_$holeIndex',
+        ) ||
+        mulliganCupProvider.mulliganCheckboxes.containsKey(
+          '${playerId}_$holeIndex',
+        ) ||
+        mulliganCupProvider.ladyCheckboxes.containsKey(
+          '${playerId}_$holeIndex',
+        );
+  }
+
+  bool _hasGameData(String playerId, int holeIndex, BuildContext context) {
+    final mulliganCupProvider = Provider.of<MulliganCupProvider>(
+      context,
+      listen: false,
+    );
+
+    // Check if there's existing game data for this hole
+    if (mulliganCupProvider.currentGame != null) {
+      final player = mulliganCupProvider.currentGame!.players.firstWhere(
+        (p) => p.id.toString() == playerId,
+        orElse: () => MulliganPlayerScore(
+          id: 0,
+          name: '',
+          handicap: 0.0,
+          gender: '',
+          drunkBackClubs: 0,
+          scores: [],
+        ),
+      );
+
+      final holeScore = player.scores.firstWhere(
+        (s) => s.holeNumber == holeIndex + 1,
+        orElse: () => MulliganHoleScore(
+          holeNumber: holeIndex + 1,
+          strokes: 0,
+          mulligan: false,
+          putts: 0,
+          lady: false,
+        ),
+      );
+
+      // Check if there's any meaningful data for this hole
+      return holeScore.strokes > 0 ||
+          holeScore.putts > 0 ||
+          holeScore.mulligan ||
+          holeScore.lady;
+    }
+
+    return false;
   }
 
   void _showFinalConfirmationDialog(BuildContext context) {

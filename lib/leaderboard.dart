@@ -5,6 +5,7 @@ import '../models/mle.dart';
 import 'services/signalr_service.dart';
 import 'scoring.dart';
 import 'landingpage.dart';
+import 'flight_leaderboard_page.dart';
 
 class LeaderboardPage extends StatefulWidget {
   final String? source; // 'landing' or 'scoring'
@@ -17,10 +18,32 @@ class LeaderboardPage extends StatefulWidget {
 }
 
 class _LeaderboardPageState extends State<LeaderboardPage> {
-  String selectedFilter = 'strokes'; // Default filter
+  String selectedFilter = 'toPar'; // Default filter
+
+  // Golf course holes data (same as scoring page)
+  final List<Map<String, dynamic>> _holes = [
+    {'number': 1, 'length': 535, 'par': 5, 'strokeIndex': 1},
+    {'number': 2, 'length': 152, 'par': 3, 'strokeIndex': 9},
+    {'number': 3, 'length': 334, 'par': 4, 'strokeIndex': 13},
+    {'number': 4, 'length': 331, 'par': 4, 'strokeIndex': 7},
+    {'number': 5, 'length': 130, 'par': 3, 'strokeIndex': 15},
+    {'number': 6, 'length': 442, 'par': 5, 'strokeIndex': 3},
+    {'number': 7, 'length': 104, 'par': 3, 'strokeIndex': 17},
+    {'number': 8, 'length': 382, 'par': 4, 'strokeIndex': 5},
+    {'number': 9, 'length': 462, 'par': 5, 'strokeIndex': 11},
+    {'number': 10, 'length': 462, 'par': 5, 'strokeIndex': 10},
+    {'number': 11, 'length': 174, 'par': 3, 'strokeIndex': 12},
+    {'number': 12, 'length': 361, 'par': 4, 'strokeIndex': 6},
+    {'number': 13, 'length': 469, 'par': 5, 'strokeIndex': 14},
+    {'number': 14, 'length': 389, 'par': 4, 'strokeIndex': 2},
+    {'number': 15, 'length': 155, 'par': 3, 'strokeIndex': 18},
+    {'number': 16, 'length': 335, 'par': 4, 'strokeIndex': 4},
+    {'number': 17, 'length': 327, 'par': 4, 'strokeIndex': 16},
+    {'number': 18, 'length': 338, 'par': 4, 'strokeIndex': 8},
+  ];
 
   final List<Map<String, String>> filterOptions = [
-    {'key': 'strokes', 'label': 'STROKES'},
+    {'key': 'toPar', 'label': 'TO PAR'},
     {'key': 'brutto', 'label': 'BRUTTO'},
     {'key': 'netto', 'label': 'NETTO'},
     {'key': 'mulligans', 'label': 'MULLIGAN'},
@@ -39,7 +62,8 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
     // Debug information
     print('🔍 Leaderboard debug:');
     print('  - Leaderboard is null: ${leaderboard == null}');
-    print('  - Entries count: ${entries.length}');
+    print('  - Total entries: ${leaderboard?.entries.length ?? 0}');
+    print('  - Filtered entries (played holes): ${entries.length}');
     print('  - Selected filter: $selectedFilter');
     if (entries.isNotEmpty) {
       print('  - First entry: ${entries.first.name}');
@@ -280,10 +304,10 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                                     flex: 1,
                                     child: _buildVerticalHeader('THRU'),
                                   ),
-                                  // Strokes header
+                                  // To Par header
                                   Expanded(
                                     flex: 1,
-                                    child: _buildVerticalHeader('STROKES'),
+                                    child: _buildVerticalHeader('TO PAR'),
                                   ),
                                   // Lady header
                                   Expanded(
@@ -311,13 +335,34 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                             // Entries list
                             Expanded(
                               child: entries.isEmpty
-                                  ? const Center(
-                                      child: Text(
-                                        'Keine Leaderboard-Daten verfügbar',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.black54,
-                                        ),
+                                  ? Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.golf_course,
+                                            size: 48,
+                                            color: Colors.black26,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          const Text(
+                                            'Keine Spieler mit gespielten Löchern',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          const Text(
+                                            'Spieler erscheinen erst nach dem ersten Loch',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black38,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     )
                                   : ListView.builder(
@@ -475,15 +520,19 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                                                   textAlign: TextAlign.center,
                                                 ),
                                               ),
-                                              // Strokes
+                                              // To Par
                                               Expanded(
                                                 flex: 1,
                                                 child: Text(
-                                                  '${entry.strokes}',
-                                                  style: const TextStyle(
+                                                  _formatToPar(
+                                                    _calculateToPar(entry),
+                                                  ),
+                                                  style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w600,
-                                                    color: Colors.black87,
+                                                    color: _getToParColor(
+                                                      _calculateToPar(entry),
+                                                    ),
                                                   ),
                                                   textAlign: TextAlign.center,
                                                 ),
@@ -561,77 +610,130 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                     // Bottom navigation
                     Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Center(
-                        child: GestureDetector(
-                          onTap: () async {
-                            if (widget.source == 'landing') {
-                              // Disconnect from SignalR and return to landing page
-                              final signalR = Provider.of<SignalRService>(
-                                context,
-                                listen: false,
-                              );
-                              await signalR.stopConnection();
-
-                              if (context.mounted) {
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const LandingPage(),
-                                  ),
-                                  (route) =>
-                                      false, // Remove all previous routes
-                                );
-                              }
-                            } else {
-                              // Go back to scoring page with current hole
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          // Flight leaderboard button
+                          GestureDetector(
+                            onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => ScoreManagementPage(
-                                    initialHole: widget.currentHole ?? 0,
-                                  ),
+                                  builder: (context) =>
+                                      const FlightLeaderboardPage(),
                                 ),
                               );
-                            }
-                          },
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFFE1F2D9),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 1,
-                                  spreadRadius: 0,
-                                  offset: Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  widget.source == 'landing'
-                                      ? Icons.home
-                                      : Icons.score,
-                                  size: 24,
-                                  color: Colors.black,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  widget.source == 'landing' ? 'Home' : 'Score',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
+                            },
+                            child: Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFE1F2D9),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 1,
+                                    spreadRadius: 0,
+                                    offset: Offset(0, 3),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.flight,
+                                    size: 24,
+                                    color: Colors.black,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Flight',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                          // Score/Home button
+                          GestureDetector(
+                            onTap: () async {
+                              if (widget.source == 'landing') {
+                                // Disconnect from SignalR and return to landing page
+                                final signalR = Provider.of<SignalRService>(
+                                  context,
+                                  listen: false,
+                                );
+                                await signalR.stopConnection();
+
+                                if (context.mounted) {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const LandingPage(),
+                                    ),
+                                    (route) =>
+                                        false, // Remove all previous routes
+                                  );
+                                }
+                              } else {
+                                // Go back to scoring page with current hole
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ScoreManagementPage(
+                                      initialHole: widget.currentHole ?? 0,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFE1F2D9),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 1,
+                                    spreadRadius: 0,
+                                    offset: Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    widget.source == 'landing'
+                                        ? Icons.home
+                                        : Icons.score,
+                                    size: 24,
+                                    color: Colors.black,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.source == 'landing'
+                                        ? 'Home'
+                                        : 'Score',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -642,20 +744,66 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
   }
 
   // Helper methods
+  int _calculateToPar(MLE entry) {
+    // Calculate total par for holes played
+    int totalPar = 0;
+    for (int i = 0; i < entry.thru; i++) {
+      if (i < _holes.length) {
+        totalPar += _holes[i]['par'] as int;
+      }
+    }
+
+    // To par = strokes - total par
+    return entry.strokes - totalPar;
+  }
+
+  String _formatToPar(int toPar) {
+    if (toPar > 0) {
+      return '+$toPar';
+    } else if (toPar < 0) {
+      return '$toPar';
+    } else {
+      return 'E';
+    }
+  }
+
+  Color _getToParColor(int toPar) {
+    if (toPar < 0) {
+      return Colors.red; // Under par - red (good)
+    } else if (toPar > 0) {
+      return Colors.black87; // Over par - black
+    } else {
+      return Colors.green; // Even par - green
+    }
+  }
+
   List<MLE> _getSortedEntries(List<MLE> entries) {
     if (entries.isEmpty) return entries;
 
-    List<MLE> sortedEntries = List.from(entries);
+    // Filter out players who haven't played any holes (thru = 0)
+    List<MLE> filteredEntries = entries
+        .where((entry) => entry.thru > 0)
+        .toList();
+
+    if (filteredEntries.isEmpty) return filteredEntries;
+
+    List<MLE> sortedEntries = List.from(filteredEntries);
 
     switch (selectedFilter) {
-      case 'strokes':
-        sortedEntries.sort((a, b) => a.strokes.compareTo(b.strokes));
+      case 'toPar':
+        sortedEntries.sort(
+          (a, b) => _calculateToPar(a).compareTo(_calculateToPar(b)),
+        );
         break;
       case 'brutto':
-        sortedEntries.sort((a, b) => a.brutto.compareTo(b.brutto));
+        sortedEntries.sort(
+          (a, b) => b.brutto.compareTo(a.brutto),
+        ); // Descending - highest first
         break;
       case 'netto':
-        sortedEntries.sort((a, b) => a.netto.compareTo(b.netto));
+        sortedEntries.sort(
+          (a, b) => b.netto.compareTo(a.netto),
+        ); // Descending - highest first
         break;
       case 'mulligans':
         sortedEntries.sort(
