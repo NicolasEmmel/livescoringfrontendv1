@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/mulligan_cup_provider.dart';
 import 'services/signalr_service.dart';
 import 'ryder_cup_games_page.dart';
+import 'leaderboard.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -12,6 +13,9 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
+  String?
+  _pendingNavigation; // Track which page to navigate to after connection
+
   @override
   void initState() {
     super.initState();
@@ -19,11 +23,24 @@ class _LandingPageState extends State<LandingPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final signalR = Provider.of<SignalRService>(context, listen: false);
       signalR.setMulliganCupNavigationCallback((flights, leaderboard) {
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const RyderCupGamesPage()),
-          );
+        if (mounted && _pendingNavigation != null) {
+          if (_pendingNavigation == 'games') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const RyderCupGamesPage(),
+              ),
+            );
+          } else if (_pendingNavigation == 'leaderboard') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    const LeaderboardPage(source: 'landing', currentHole: 0),
+              ),
+            );
+          }
+          _pendingNavigation = null; // Reset after navigation
         }
       });
     });
@@ -97,6 +114,9 @@ class _LandingPageState extends State<LandingPage> {
 
                                     // Set connecting state manually for the entire retry process
                                     signalR.setConnectingState(true);
+
+                                    // Set pending navigation for games page
+                                    _pendingNavigation = 'games';
 
                                     for (
                                       int attempt = 1;
@@ -221,32 +241,118 @@ class _LandingPageState extends State<LandingPage> {
                     ),
                     child: Material(
                       color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () {
-                          // Button functionality removed - UI only
+                      child: Consumer<SignalRService>(
+                        builder: (context, signalR, child) {
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: signalR.isConnecting
+                                ? null
+                                : () async {
+                                    const int maxRetries = 3;
+                                    const Duration retryDelay = Duration(
+                                      milliseconds: 500,
+                                    );
+
+                                    // Set connecting state manually for the entire retry process
+                                    signalR.setConnectingState(true);
+
+                                    // Set pending navigation for leaderboard page
+                                    _pendingNavigation = 'leaderboard';
+
+                                    for (
+                                      int attempt = 1;
+                                      attempt <= maxRetries;
+                                      attempt++
+                                    ) {
+                                      try {
+                                        print(
+                                          "🔄 Leaderboard connection attempt $attempt of $maxRetries",
+                                        );
+
+                                        // Set up providers
+                                        signalR.setMulliganCupProvider(
+                                          Provider.of<MulliganCupProvider>(
+                                            context,
+                                            listen: false,
+                                          ),
+                                        );
+
+                                        // Start SignalR connection
+                                        await signalR.startConnection();
+
+                                        // Success! The navigation will happen automatically when data is received
+                                        print(
+                                          "✅ SignalR connected for leaderboard, waiting for data...",
+                                        );
+                                        return; // Exit the retry loop on success
+                                      } catch (e) {
+                                        print(
+                                          "❌ Leaderboard connection attempt $attempt failed: $e",
+                                        );
+
+                                        if (attempt < maxRetries) {
+                                          // Wait before retrying
+                                          await Future.delayed(retryDelay);
+                                        } else {
+                                          // All retries failed
+                                          signalR.setConnectingState(false);
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Verbindungsfehler nach $maxRetries Versuchen: Bitte erneut versuchen',
+                                                ),
+                                                backgroundColor: Colors.red,
+                                                duration: const Duration(
+                                                  seconds: 3,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (signalR.isConnecting)
+                                    const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Color(0xFF2E7D32),
+                                            ),
+                                      ),
+                                    )
+                                  else
+                                    const Icon(
+                                      Icons.leaderboard,
+                                      color: Color(0xFF2E7D32),
+                                      size: 28,
+                                    ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    signalR.isConnecting
+                                        ? 'Verbinde...'
+                                        : 'Leaderboard anzeigen',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
                         },
-                        child: const Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.leaderboard,
-                                color: Color(0xFF2E7D32),
-                                size: 28,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'Leaderboard anzeigen',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2E7D32),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ),
