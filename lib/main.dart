@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:livescoringfrontendv1/services/signalr_service.dart';
 import 'package:provider/provider.dart';
 import 'package:livescoringfrontendv1/landingpage.dart';
+import 'ryder_cup_games_page.dart';
 import 'providers/flight_score_provider.dart';
 import 'providers/game_provider.dart';
-import 'ryder_cup_leaderboard.dart';
-import 'games_scores_page.dart';
+import 'providers/mulligan_cup_provider.dart';
 
 void main() {
   final signalRService = SignalRService();
@@ -17,6 +17,7 @@ void main() {
           create: (_) => FlightScoreProvider(signalRService),
         ),
         ChangeNotifierProvider(create: (_) => GameProvider()),
+        ChangeNotifierProvider(create: (_) => MulliganCupProvider()),
       ],
       child: const MyApp(), // replace with your root widget
     ),
@@ -37,9 +38,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const LandingPage(),
-        '/leaderboard': (context) =>
-            const RyderCupLeaderboardPage(source: 'scoring'),
-        '/games-scores': (context) => const GamesScoresPage(),
+        '/games': (context) => const RyderCupGamesPage(),
       },
     );
   }

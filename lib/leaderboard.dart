@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/flight_score_provider.dart';
-import '../models/leaderboard.dart';
+import '../providers/mulligan_cup_provider.dart';
+import '../models/mle.dart';
 import 'services/signalr_service.dart';
 import 'scoring.dart';
 import 'landingpage.dart';
@@ -17,18 +17,33 @@ class LeaderboardPage extends StatefulWidget {
 }
 
 class _LeaderboardPageState extends State<LeaderboardPage> {
-  String selectedTournament = 'Male'; // Default to Male tournament
+  String selectedFilter = 'strokes'; // Default filter
 
-  final List<String> tournaments = ['Male', 'Senior'];
+  final List<Map<String, String>> filterOptions = [
+    {'key': 'strokes', 'label': 'STROKES'},
+    {'key': 'brutto', 'label': 'BRUTTO'},
+    {'key': 'netto', 'label': 'NETTO'},
+    {'key': 'mulligans', 'label': 'MULLIGAN'},
+    {'key': 'lady', 'label': 'LADY'},
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final leaderboard = Provider.of<FlightScoreProvider>(context).leaderboard;
+    final mulliganCupProvider = Provider.of<MulliganCupProvider>(context);
+    final leaderboard = mulliganCupProvider.leaderboard;
     final signalR = Provider.of<SignalRService>(context);
 
-    // Filter and process leaderboard entries
-    final filteredEntries = _getFilteredEntries(leaderboard.entries ?? []);
-    final hasMultipleDays = _hasMultipleDays(leaderboard.entries ?? []);
+    // Get leaderboard entries and sort them
+    final entries = _getSortedEntries(leaderboard?.entries ?? []);
+
+    // Debug information
+    print('🔍 Leaderboard debug:');
+    print('  - Leaderboard is null: ${leaderboard == null}');
+    print('  - Entries count: ${entries.length}');
+    print('  - Selected filter: $selectedFilter');
+    if (entries.isNotEmpty) {
+      print('  - First entry: ${entries.first.name}');
+    }
 
     return Scaffold(
       body: Container(
@@ -181,27 +196,29 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                       ),
                     ),
 
-                    // Tournament selector
+                    const SizedBox(height: 16),
+
+                    // Filter buttons
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
-                        children: tournaments.map((tournament) {
-                          final isSelected = selectedTournament == tournament;
+                        children: filterOptions.map((filter) {
+                          final isSelected = selectedFilter == filter['key'];
                           return Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
+                                horizontal: 2,
                               ),
                               child: GestureDetector(
                                 onTap: () {
                                   setState(() {
-                                    selectedTournament = tournament;
+                                    selectedFilter = filter['key']!;
                                   });
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 8,
-                                    horizontal: 12,
+                                    horizontal: 4,
                                   ),
                                   decoration: BoxDecoration(
                                     color: isSelected
@@ -212,7 +229,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                                             255,
                                             255,
                                           ),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
                                       color: isSelected
                                           ? const Color(0xFF2E7D32)
@@ -221,10 +238,10 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                                     ),
                                   ),
                                   child: Text(
-                                    _getTournamentDisplayName(tournament),
+                                    filter['label']!,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                       color: isSelected
                                           ? Colors.white
@@ -241,8 +258,6 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
 
                     const SizedBox(height: 12),
 
-                    const SizedBox(height: 16),
-
                     // Leaderboard entries
                     Expanded(
                       child: Padding(
@@ -258,82 +273,47 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                               ),
                               child: Row(
                                 children: [
-                                  // Position header
-                                  Expanded(
-                                    flex: 1,
-                                    child: Text(
-                                      'POS',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.black87,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                  // Name header
-                                  Expanded(
-                                    flex: 3,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(left: 16),
-                                      child: Text(
-                                        'PLAYER',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  // Empty space for player names (no header)
+                                  Expanded(flex: 3, child: Container()),
                                   // Thru header
                                   Expanded(
                                     flex: 1,
-                                    child: Text(
-                                      'THRU',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.black87,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
+                                    child: _buildVerticalHeader('THRU'),
                                   ),
-                                  // Today header
+                                  // Strokes header
                                   Expanded(
                                     flex: 1,
-                                    child: Text(
-                                      'R ${_getCurrentDay()}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.black87,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
+                                    child: _buildVerticalHeader('STROKES'),
                                   ),
-                                  // Total header
+                                  // Lady header
                                   Expanded(
                                     flex: 1,
-                                    child: Text(
-                                      'ALL',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.black87,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
+                                    child: _buildVerticalHeader('LADY'),
+                                  ),
+                                  // Mulligans header
+                                  Expanded(
+                                    flex: 1,
+                                    child: _buildVerticalHeader('MULLIGANS'),
+                                  ),
+                                  // Brutto header
+                                  Expanded(
+                                    flex: 1,
+                                    child: _buildVerticalHeader('BRUTTO'),
+                                  ),
+                                  // Netto header
+                                  Expanded(
+                                    flex: 1,
+                                    child: _buildVerticalHeader('NETTO'),
                                   ),
                                 ],
                               ),
                             ),
                             // Entries list
                             Expanded(
-                              child: filteredEntries.isEmpty
+                              child: entries.isEmpty
                                   ? const Center(
                                       child: Text(
-                                        'Keine Daten für diese Auswahl verfügbar',
+                                        'Keine Leaderboard-Daten verfügbar',
                                         style: TextStyle(
                                           fontSize: 16,
                                           color: Colors.black54,
@@ -341,102 +321,145 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                                       ),
                                     )
                                   : ListView.builder(
-                                      itemCount: filteredEntries.length,
+                                      itemCount: entries.length,
                                       itemBuilder: (context, index) {
-                                        final entry = filteredEntries[index];
+                                        final entry = entries[index];
                                         return Container(
                                           margin: const EdgeInsets.only(
-                                            bottom: 12,
+                                            bottom: 8,
                                           ),
                                           padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 12,
+                                            horizontal: 12,
+                                            vertical: 10,
                                           ),
                                           decoration: BoxDecoration(
                                             color: const Color.fromARGB(
-                                              25,
+                                              30,
                                               255,
                                               255,
                                               255,
                                             ),
                                             borderRadius: BorderRadius.circular(
-                                              12,
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.grey.shade300,
+                                              width: 0.5,
                                             ),
                                             boxShadow: const [
                                               BoxShadow(
-                                                color: Colors.black26,
-                                                blurRadius: 1,
+                                                color: Colors.black12,
+                                                blurRadius: 2,
                                                 spreadRadius: 0,
-                                                offset: Offset(0, 3),
+                                                offset: Offset(0, 1),
                                               ),
                                             ],
                                           ),
                                           child: Row(
                                             children: [
-                                              // Position
-                                              Expanded(
-                                                flex: 1,
-                                                child: Text(
-                                                  '${index + 1}',
-                                                  style: const TextStyle(
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: Colors.black,
-                                                  ),
-                                                ),
-                                              ),
-                                              // Player name
+                                              // Player name with position
                                               Expanded(
                                                 flex: 3,
-                                                child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        left: 16,
-                                                      ),
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      Text(
-                                                        entry.name
-                                                            .split(' ')
-                                                            .first,
-                                                        style: const TextStyle(
-                                                          fontSize: 16,
-                                                          fontWeight:
-                                                              FontWeight.w900,
-                                                          color: Colors.black,
+                                                child: Row(
+                                                  children: [
+                                                    // Position number
+                                                    Container(
+                                                      width: 24,
+                                                      height: 24,
+                                                      margin:
+                                                          const EdgeInsets.only(
+                                                            right: 8,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: index < 3
+                                                            ? _getPositionColor(
+                                                                index,
+                                                              )
+                                                            : Colors
+                                                                  .grey
+                                                                  .shade200,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              12,
+                                                            ),
+                                                        border: Border.all(
+                                                          color: index < 3
+                                                              ? _getPositionColor(
+                                                                  index,
+                                                                )
+                                                              : Colors
+                                                                    .grey
+                                                                    .shade400,
+                                                          width: 1,
                                                         ),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
                                                       ),
-                                                      if (entry.name
-                                                              .split(' ')
-                                                              .length >
-                                                          1)
-                                                        Text(
-                                                          entry.name
-                                                              .split(' ')
-                                                              .sublist(1)
-                                                              .join(' '),
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 16,
+                                                      child: Center(
+                                                        child: Text(
+                                                          '${index + 1}',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w900,
+                                                            color: index < 3
+                                                                ? Colors.white
+                                                                : Colors
+                                                                      .black87,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    // Player name
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Text(
+                                                            entry.name
+                                                                .split(' ')
+                                                                .first,
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 15,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w800,
+                                                                  color: Colors
+                                                                      .black,
+                                                                ),
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                          if (entry.name
+                                                                  .split(' ')
+                                                                  .length >
+                                                              1)
+                                                            Text(
+                                                              entry.name
+                                                                  .split(' ')
+                                                                  .sublist(1)
+                                                                  .join(' '),
+                                                              style: const TextStyle(
+                                                                fontSize: 13,
                                                                 fontWeight:
                                                                     FontWeight
-                                                                        .w900,
+                                                                        .w600,
                                                                 color: Colors
-                                                                    .black,
+                                                                    .black54,
                                                               ),
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                    ],
-                                                  ),
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                               // Thru
@@ -445,42 +468,81 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                                                 child: Text(
                                                   '${entry.thru}',
                                                   style: const TextStyle(
-                                                    fontSize: 18,
+                                                    fontSize: 16,
                                                     fontWeight: FontWeight.w600,
                                                     color: Colors.black87,
                                                   ),
                                                   textAlign: TextAlign.center,
                                                 ),
                                               ),
-                                              // Today score
+                                              // Strokes
                                               Expanded(
                                                 flex: 1,
                                                 child: Text(
-                                                  _getTodayScore(entry),
+                                                  '${entry.strokes}',
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.black87,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ),
+                                              // Lady count
+                                              Expanded(
+                                                flex: 1,
+                                                child: Text(
+                                                  '${entry.ladyCount}',
                                                   style: TextStyle(
-                                                    fontSize: 18,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: entry.ladyCount > 0
+                                                        ? Colors.pink.shade700
+                                                        : Colors.black54,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ),
+                                              // Mulligans
+                                              Expanded(
+                                                flex: 1,
+                                                child: Text(
+                                                  '${entry.mulligans}',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: entry.mulligans > 0
+                                                        ? Colors.orange.shade700
+                                                        : Colors.black54,
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ),
+                                              // Brutto score
+                                              Expanded(
+                                                flex: 1,
+                                                child: Text(
+                                                  _getBruttoScore(entry),
+                                                  style: TextStyle(
+                                                    fontSize: 16,
                                                     fontWeight: FontWeight.w600,
                                                     color: _getScoreColor(
-                                                      _getTodayScoreValue(
-                                                        entry,
-                                                      ),
+                                                      entry.brutto,
                                                     ),
                                                   ),
                                                   textAlign: TextAlign.center,
                                                 ),
                                               ),
-                                              // Total score
+                                              // Netto score
                                               Expanded(
                                                 flex: 1,
                                                 child: Text(
-                                                  _getTotalScore(entry),
+                                                  _getNettoScore(entry),
                                                   style: TextStyle(
-                                                    fontSize: 18,
+                                                    fontSize: 16,
                                                     fontWeight: FontWeight.w600,
                                                     color: _getScoreColor(
-                                                      _getTotalScoreValue(
-                                                        entry,
-                                                      ),
+                                                      entry.netto,
                                                     ),
                                                   ),
                                                   textAlign: TextAlign.center,
@@ -580,107 +642,76 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
   }
 
   // Helper methods
-  String _getTournamentDisplayName(String tournament) {
-    switch (tournament) {
-      case 'Male':
-        return 'Herren';
-      case 'Senior':
-        return 'Senior';
-      default:
-        return tournament;
+  List<MLE> _getSortedEntries(List<MLE> entries) {
+    if (entries.isEmpty) return entries;
+
+    List<MLE> sortedEntries = List.from(entries);
+
+    switch (selectedFilter) {
+      case 'strokes':
+        sortedEntries.sort((a, b) => a.strokes.compareTo(b.strokes));
+        break;
+      case 'brutto':
+        sortedEntries.sort((a, b) => a.brutto.compareTo(b.brutto));
+        break;
+      case 'netto':
+        sortedEntries.sort((a, b) => a.netto.compareTo(b.netto));
+        break;
+      case 'mulligans':
+        sortedEntries.sort(
+          (a, b) => b.mulligans.compareTo(a.mulligans),
+        ); // Descending
+        break;
+      case 'lady':
+        sortedEntries.sort(
+          (a, b) => b.ladyCount.compareTo(a.ladyCount),
+        ); // Descending
+        break;
     }
+
+    return sortedEntries;
   }
 
-  int _getCurrentDay() {
-    final leaderboard = Provider.of<FlightScoreProvider>(
-      context,
-      listen: false,
-    ).leaderboard;
-
-    final tournamentEntries = leaderboard.entries
-        .where((entry) => entry.tournamentName == selectedTournament)
-        .toList();
-
-    if (tournamentEntries.isEmpty) return 1;
-
-    // Get the latest day
-    return tournamentEntries.map((e) => e.day).reduce((a, b) => a > b ? a : b);
+  Widget _buildVerticalHeader(String text) {
+    return Center(
+      child: RotatedBox(
+        quarterTurns: 3, // 90 degrees clockwise
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
+          ),
+        ),
+      ),
+    );
   }
 
-  bool _hasMultipleDays(List<LeaderboardEntry> entries) {
-    final tournamentEntries = entries
-        .where((entry) => entry.tournamentName == selectedTournament)
-        .toList();
-
-    if (tournamentEntries.isEmpty) return false;
-
-    final days = tournamentEntries.map((e) => e.day).toSet();
-    return days.length > 1;
+  String _getBruttoScore(MLE entry) {
+    return entry.brutto > 0 ? '+${entry.brutto}' : '${entry.brutto}';
   }
 
-  List<LeaderboardEntry> _getFilteredEntries(List<LeaderboardEntry> entries) {
-    // Filter by tournament
-    final tournamentEntries = entries
-        .where((entry) => entry.tournamentName == selectedTournament)
-        .toList();
-
-    if (tournamentEntries.isEmpty) return [];
-
-    // Get the latest day
-    final latestDay = tournamentEntries
-        .map((e) => e.day)
-        .reduce((a, b) => a > b ? a : b);
-
-    // Get today's entries (latest day)
-    final todayEntries = tournamentEntries
-        .where((e) => e.day == latestDay)
-        .toList();
-
-    // Sort by total score
-    todayEntries.sort((a, b) {
-      final totalScoreA = _getTotalScoreValue(a);
-      final totalScoreB = _getTotalScoreValue(b);
-      return totalScoreA.compareTo(totalScoreB);
-    });
-
-    return todayEntries;
-  }
-
-  String _getTodayScore(LeaderboardEntry entry) {
-    return entry.toPar > 0 ? '+${entry.toPar}' : '${entry.toPar}';
-  }
-
-  int _getTodayScoreValue(LeaderboardEntry entry) {
-    return entry.toPar;
-  }
-
-  String _getTotalScore(LeaderboardEntry entry) {
-    final totalValue = _getTotalScoreValue(entry);
-    return totalValue > 0 ? '+$totalValue' : '$totalValue';
-  }
-
-  int _getTotalScoreValue(LeaderboardEntry entry) {
-    final leaderboard = Provider.of<FlightScoreProvider>(
-      context,
-      listen: false,
-    ).leaderboard;
-
-    // Get all entries for this player in the selected tournament
-    final playerEntries = leaderboard.entries
-        .where(
-          (e) =>
-              e.playerId == entry.playerId &&
-              e.tournamentName == selectedTournament,
-        )
-        .toList();
-
-    // Sum up all toPar scores
-    return playerEntries.fold(0, (sum, e) => sum + e.toPar);
+  String _getNettoScore(MLE entry) {
+    return entry.netto > 0 ? '+${entry.netto}' : '${entry.netto}';
   }
 
   Color _getScoreColor(int score) {
     if (score > 0) return Colors.red.shade700;
     if (score < 0) return Colors.green.shade700;
     return Colors.black87;
+  }
+
+  Color _getPositionColor(int index) {
+    switch (index) {
+      case 0:
+        return Colors.amber.shade600; // Gold for 1st place
+      case 1:
+        return Colors.grey.shade500; // Silver for 2nd place
+      case 2:
+        return Colors.orange.shade700; // Bronze for 3rd place
+      default:
+        return Colors.grey.shade200;
+    }
   }
 }

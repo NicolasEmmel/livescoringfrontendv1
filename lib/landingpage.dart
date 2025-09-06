@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:livescoringfrontendv1/ryder_cup_games_page.dart';
-import '../providers/flight_score_provider.dart';
-import '../providers/game_provider.dart';
+import 'providers/mulligan_cup_provider.dart';
 import 'services/signalr_service.dart';
+import 'ryder_cup_games_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -16,10 +15,10 @@ class _LandingPageState extends State<LandingPage> {
   @override
   void initState() {
     super.initState();
-    // Set up navigation callback for when games are received
+    // Set up navigation callback for when Mulligan Cup data is received
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final signalR = Provider.of<SignalRService>(context, listen: false);
-      signalR.setNavigationCallback((games) {
+      signalR.setMulliganCupNavigationCallback((flights, leaderboard) {
         if (mounted) {
           Navigator.push(
             context,
@@ -53,7 +52,7 @@ class _LandingPageState extends State<LandingPage> {
                 ),
                 const SizedBox(height: 40),
                 const Text(
-                  'Ryder-Cup 2025',
+                  'Mulligan-Cup 2025',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 32,
@@ -109,24 +108,20 @@ class _LandingPageState extends State<LandingPage> {
                                           "🔄 Connection attempt $attempt of $maxRetries",
                                         );
 
+                                        // Set up providers
+                                        signalR.setMulliganCupProvider(
+                                          Provider.of<MulliganCupProvider>(
+                                            context,
+                                            listen: false,
+                                          ),
+                                        );
+
                                         // Start SignalR connection
-                                        signalR.setScoreProvider(
-                                          Provider.of<FlightScoreProvider>(
-                                            context,
-                                            listen: false,
-                                          ),
-                                        );
-                                        signalR.setGameProvider(
-                                          Provider.of<GameProvider>(
-                                            context,
-                                            listen: false,
-                                          ),
-                                        );
                                         await signalR.startConnection();
 
-                                        // Success! The navigation will happen automatically when games are received
+                                        // Success! The navigation will happen automatically when data is received
                                         print(
-                                          "✅ SignalR connected, waiting for games...",
+                                          "✅ SignalR connected, waiting for Mulligan Cup data...",
                                         );
                                         return; // Exit the retry loop on success
                                       } catch (e) {
@@ -226,142 +221,32 @@ class _LandingPageState extends State<LandingPage> {
                     ),
                     child: Material(
                       color: Colors.transparent,
-                      child: Consumer<SignalRService>(
-                        builder: (context, signalR, child) {
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: signalR.isConnecting
-                                ? null
-                                : () async {
-                                    const int maxRetries = 3;
-                                    const Duration retryDelay = Duration(
-                                      milliseconds: 500,
-                                    );
-
-                                    // Set connecting state manually for the entire retry process
-                                    signalR.setConnectingState(true);
-
-                                    for (
-                                      int attempt = 1;
-                                      attempt <= maxRetries;
-                                      attempt++
-                                    ) {
-                                      try {
-                                        print(
-                                          "🔄 Connection attempt $attempt of $maxRetries",
-                                        );
-
-                                        // Start SignalR connection
-                                        signalR.setScoreProvider(
-                                          Provider.of<FlightScoreProvider>(
-                                            context,
-                                            listen: false,
-                                          ),
-                                        );
-                                        signalR.setGameProvider(
-                                          Provider.of<GameProvider>(
-                                            context,
-                                            listen: false,
-                                          ),
-                                        );
-                                        await signalR.startConnection();
-
-                                        // Wait a moment for connection to fully establish
-                                        await Future.delayed(
-                                          const Duration(milliseconds: 500),
-                                        );
-
-                                        // Success! Navigate to leaderboard
-                                        print(
-                                          "✅ SignalR connected, navigating to leaderboard...",
-                                        );
-
-                                        // Reset connecting state before navigation
-                                        signalR.setConnectingState(false);
-
-                                        if (context.mounted) {
-                                          print(
-                                            "🚀 Navigating to leaderboard...",
-                                          );
-                                          Navigator.pushNamed(
-                                            context,
-                                            '/leaderboard',
-                                          );
-                                          print("✅ Navigation completed");
-                                        } else {
-                                          print(
-                                            "❌ Context not mounted, cannot navigate",
-                                          );
-                                        }
-                                        return; // Exit the retry loop on success
-                                      } catch (e) {
-                                        print(
-                                          "❌ Connection attempt $attempt failed: $e",
-                                        );
-
-                                        if (attempt < maxRetries) {
-                                          // Wait before retrying
-                                          await Future.delayed(retryDelay);
-                                        } else {
-                                          // All retries failed
-                                          signalR.setConnectingState(false);
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'Verbindungsfehler nach $maxRetries Versuchen: Bitte erneut versuchen',
-                                                ),
-                                                backgroundColor: Colors.red,
-                                                duration: const Duration(
-                                                  seconds: 3,
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        }
-                                      }
-                                    }
-                                  },
-                            child: Center(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (signalR.isConnecting)
-                                    const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              Color(0xFF2E7D32),
-                                            ),
-                                      ),
-                                    )
-                                  else
-                                    const Icon(
-                                      Icons.leaderboard,
-                                      color: Color(0xFF2E7D32),
-                                      size: 28,
-                                    ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    signalR.isConnecting
-                                        ? 'Verbinde...'
-                                        : 'Leaderboard anzeigen',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF2E7D32),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          // Button functionality removed - UI only
                         },
+                        child: const Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.leaderboard,
+                                color: Color(0xFF2E7D32),
+                                size: 28,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Leaderboard anzeigen',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),

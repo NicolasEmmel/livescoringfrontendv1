@@ -1,14 +1,16 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:livescoringfrontendv1/models/leaderboard.dart';
 import 'package:livescoringfrontendv1/models/game.dart';
-import 'package:provider/provider.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
 import '../providers/flight_score_provider.dart';
 import '../providers/game_provider.dart';
+import '../providers/mulligan_cup_provider.dart';
+import '../models/mulligan_cup_flight.dart';
+import '../models/mulligan_cup_leaderboard.dart';
+import '../models/mulligan_cup_game.dart';
 
 class SignalRService with ChangeNotifier {
   HubConnection? _hubConnection;
@@ -18,9 +20,13 @@ class SignalRService with ChangeNotifier {
 
   FlightScoreProvider? _scoreProvider;
   GameProvider? _gameProvider;
+  MulliganCupProvider? _mulliganCupProvider;
 
   // Navigation callback for when games are received
   Function(List<Game>)? _navigationCallback;
+  // Navigation callback for when Mulligan Cup data is received
+  Function(List<MulliganCupFlight>, MulliganCupLeaderboard)?
+  _mulliganCupNavigationCallback;
 
   void setScoreProvider(FlightScoreProvider provider) {
     _scoreProvider = provider;
@@ -30,8 +36,18 @@ class SignalRService with ChangeNotifier {
     _gameProvider = provider;
   }
 
+  void setMulliganCupProvider(MulliganCupProvider provider) {
+    _mulliganCupProvider = provider;
+  }
+
   void setNavigationCallback(Function(List<Game>) callback) {
     _navigationCallback = callback;
+  }
+
+  void setMulliganCupNavigationCallback(
+    Function(List<MulliganCupFlight>, MulliganCupLeaderboard) callback,
+  ) {
+    _mulliganCupNavigationCallback = callback;
   }
 
   List<Game> get ryderCupGames => _gameProvider?.games ?? [];
@@ -287,6 +303,139 @@ class SignalRService with ChangeNotifier {
         print("📨 Message received: $arguments");
       });
 
+      // Listener for receiving Mulligan Cup initialization data
+      _hubConnection!.on("ReceiveInit", (List<Object?>? arguments) {
+        print("📨 Received Mulligan Cup init data: $arguments");
+
+        if (arguments != null && arguments.length >= 2) {
+          try {
+            // Parse flights (arg1)
+            final flightsData = arguments[0];
+            List<MulliganCupFlight> flights = [];
+
+            if (flightsData is List) {
+              flights = flightsData.map((flightData) {
+                if (flightData is Map<String, dynamic>) {
+                  return MulliganCupFlight.fromJson(flightData);
+                } else {
+                  throw Exception("Invalid flight data format");
+                }
+              }).toList();
+            }
+
+            // Parse leaderboard (arg2)
+            final leaderboardData = arguments[1];
+            MulliganCupLeaderboard? leaderboard;
+
+            if (leaderboardData is Map<String, dynamic>) {
+              leaderboard = MulliganCupLeaderboard.fromJson(leaderboardData);
+            }
+
+            print("✅ Parsed ${flights.length} Mulligan Cup flights");
+            print(
+              "✅ Parsed leaderboard with ${leaderboard?.entries.length ?? 0} entries",
+            );
+
+            // Store the data in the provider
+            if (_mulliganCupProvider != null) {
+              _mulliganCupProvider!.setFlights(flights);
+              if (leaderboard != null) {
+                _mulliganCupProvider!.setLeaderboard(leaderboard);
+              }
+            }
+
+            // Navigate to the games page if we have a navigation context
+            if (_mulliganCupNavigationCallback != null) {
+              print(
+                "🧭 Calling Mulligan Cup navigation callback with ${flights.length} flights",
+              );
+              _mulliganCupNavigationCallback!(
+                flights,
+                leaderboard ?? MulliganCupLeaderboard(entries: []),
+              );
+            } else {
+              print("⚠️ No Mulligan Cup navigation callback set");
+            }
+
+            notifyListeners();
+          } catch (e) {
+            print("❌ Failed to parse Mulligan Cup init data: $e");
+          }
+        } else {
+          print("⚠️ Invalid Mulligan Cup init data format: $arguments");
+        }
+      });
+
+      // Listener for receiving flight scores from the backend
+      _hubConnection!.on("ReceiveFlightScores", (List<Object?>? arguments) {
+        print("📨 Received flight scores: $arguments");
+
+        if (arguments != null && arguments.isNotEmpty) {
+          final data = arguments[0];
+
+          if (data is Map<String, dynamic>) {
+            try {
+              final game = MulliganCupGame.fromJson(data);
+              print(
+                "✅ Parsed flight scores for game ${game.id} with ${game.players.length} players",
+              );
+
+              // Store the game data in the provider
+              if (_mulliganCupProvider != null) {
+                _mulliganCupProvider!.setCurrentGame(game);
+              }
+
+              notifyListeners();
+            } catch (e) {
+              print("❌ Failed to parse flight scores: $e");
+            }
+          } else {
+            print("⚠️ Invalid flight scores data format: $data");
+          }
+        } else {
+          print("⚠️ Invalid flight scores arguments: $arguments");
+        }
+      });
+
+      // Listener for receiving updated leaderboard from the backend
+      _hubConnection!.on("ReceiveLeaderboard", (List<Object?>? arguments) {
+        print("📨 Received updated leaderboard: $arguments");
+
+        if (arguments != null && arguments.isNotEmpty) {
+          final data = arguments[0];
+
+          if (data is Map<String, dynamic>) {
+            try {
+              final leaderboard = MulliganCupLeaderboard.fromJson(data);
+              print(
+                "✅ Parsed updated leaderboard with ${leaderboard.entries.length} entries",
+              );
+              if (leaderboard.entries.isNotEmpty) {
+                print("✅ First entry: ${leaderboard.entries.first.name}");
+              }
+
+              // Store the updated leaderboard in the provider
+              if (_mulliganCupProvider != null) {
+                _mulliganCupProvider!.setLeaderboard(leaderboard);
+                print("✅ Leaderboard stored in provider");
+              } else {
+                print(
+                  "⚠️ MulliganCupProvider is null, cannot store leaderboard",
+                );
+              }
+
+              notifyListeners();
+            } catch (e) {
+              print("❌ Failed to parse updated leaderboard: $e");
+            }
+          } else {
+            print("⚠️ Invalid leaderboard data format: $data");
+          }
+        } else {
+          print("⚠️ Invalid leaderboard arguments: $arguments");
+        }
+      });
+
       // Listener for receiving saved scores from the backend
       _hubConnection!.on("ReceiveSavedScores", (List<Object?>? arguments) {
         print("📨 Received saved scores: $arguments");
@@ -465,6 +614,25 @@ class SignalRService with ChangeNotifier {
     }
   }
 
+  Future<void> sendMulliganCupGameUpdate(Map<String, dynamic> gameData) async {
+    const method = 'SendScoreUpdate';
+
+    if (_hubConnection != null &&
+        _hubConnection!.state == HubConnectionState.Connected) {
+      try {
+        print('📡 Sending Mulligan Cup game update...');
+        await _hubConnection!.invoke(method, args: [gameData]);
+        print("📤 Sent message: $method => $gameData");
+        return;
+      } catch (e) {
+        print('❌ Error sending Mulligan Cup game update: $e');
+        rethrow;
+      }
+    } else {
+      throw Exception('SignalR connection not available');
+    }
+  }
+
   Future<void> sendGameScoreUpdate(int points1, int points2, int gameId) async {
     const method = 'SendScoreUpdate';
 
@@ -505,6 +673,25 @@ class SignalRService with ChangeNotifier {
     if (_hubConnection == null ||
         _hubConnection!.state != HubConnectionState.Connected) {
       throw Exception("SignalR not connected after $retries attempts.");
+    }
+  }
+
+  Future<void> requestFlightScores(int flightId) async {
+    const method = 'ReceiveFlightScores';
+
+    if (_hubConnection != null &&
+        _hubConnection!.state == HubConnectionState.Connected) {
+      try {
+        print('📡 Requesting flight scores for flight $flightId...');
+        await _hubConnection!.invoke(method, args: [flightId]);
+        print("📤 Sent request: $method => [$flightId]");
+        return;
+      } catch (e) {
+        print('❌ Error requesting flight scores: $e');
+        rethrow;
+      }
+    } else {
+      throw Exception('SignalR connection not available');
     }
   }
 

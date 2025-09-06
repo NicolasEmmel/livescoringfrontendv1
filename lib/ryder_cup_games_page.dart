@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'providers/game_provider.dart';
-import 'game_scoring_page.dart';
+import 'providers/mulligan_cup_provider.dart';
 import 'services/signalr_service.dart';
 import 'landingpage.dart';
+import 'scoring.dart';
 
 class RyderCupGamesPage extends StatefulWidget {
   const RyderCupGamesPage({super.key});
@@ -13,54 +13,6 @@ class RyderCupGamesPage extends StatefulWidget {
 }
 
 class _RyderCupGamesPageState extends State<RyderCupGamesPage> {
-  String _selectedGameType = '';
-
-  List<String> get _gameTypes {
-    final gameProvider = Provider.of<GameProvider>(context, listen: false);
-    final types = <String>{};
-
-    for (final game in gameProvider.games) {
-      if (game.name.toLowerCase().contains('chapman')) {
-        types.add('Chapman');
-      } else if (game.name.toLowerCase().contains('best') ||
-          game.name.toLowerCase().contains('ball')) {
-        types.add('Best Ball');
-      } else if (game.name.toLowerCase().contains('einzel')) {
-        types.add('Einzel');
-      }
-    }
-
-    final sortedTypes = types.toList()..sort();
-
-    // Set default selection to first available type if none selected
-    if (_selectedGameType.isEmpty && sortedTypes.isNotEmpty) {
-      _selectedGameType = sortedTypes.first;
-    }
-
-    return sortedTypes;
-  }
-
-  List<dynamic> get _filteredGames {
-    final gameProvider = Provider.of<GameProvider>(context, listen: false);
-    if (_selectedGameType.isEmpty) {
-      return <dynamic>[];
-    }
-
-    return gameProvider.games.where((game) {
-      final name = game.name.toLowerCase();
-      switch (_selectedGameType) {
-        case 'Chapman':
-          return name.contains('chapman');
-        case 'Best Ball':
-          return name.contains('best') || name.contains('ball');
-        case 'Einzel':
-          return name.contains('einzel');
-        default:
-          return false;
-      }
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,172 +31,144 @@ class _RyderCupGamesPageState extends State<RyderCupGamesPage> {
               children: [
                 const SizedBox(height: 16),
 
-                // Filter Buttons
-                Consumer<GameProvider>(
-                  builder: (context, gameProvider, child) {
-                    if (gameProvider.games.isEmpty) {
-                      return const SizedBox.shrink();
+                // Title
+                const Text(
+                  'Mulligan-Cup 2025',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                const Text(
+                  'Flightauswahl',
+                  style: TextStyle(fontSize: 16, color: Color(0xFF2E7D32)),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Flights Grid
+                Consumer<MulliganCupProvider>(
+                  builder: (context, mulliganCupProvider, child) {
+                    if (mulliganCupProvider.flights.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Text(
+                            'No flights available',
+                            style: TextStyle(fontSize: 18, color: Colors.grey),
+                          ),
+                        ),
+                      );
                     }
 
-                    final gameTypes = _gameTypes;
-
-                    return Container(
+                    return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: gameTypes.map((gameType) {
-                            final isSelected = _selectedGameType == gameType;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 12),
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedGameType = gameType;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? const Color(0xFF2E7D32)
-                                        : const Color(0xFFE1F2D9),
-                                    borderRadius: BorderRadius.circular(25),
-                                    border: Border.all(
-                                      color: const Color(0xFF2E7D32),
-                                      width: 2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.1,
+                      child: Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: mulliganCupProvider.flights.map((flight) {
+                          return SizedBox(
+                            width: (MediaQuery.of(context).size.width - 64) / 2,
+                            child: GestureDetector(
+                              onTap: () async {
+                                try {
+                                  // Request flight scores from backend
+                                  final signalR = Provider.of<SignalRService>(
+                                    context,
+                                    listen: false,
+                                  );
+
+                                  await signalR.requestFlightScores(flight.id);
+
+                                  // Navigate to scoring page
+                                  if (context.mounted) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            ScoreManagementPage(flight: flight),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  print('❌ Error requesting flight scores: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Fehler beim Laden der Flugdaten: $e',
                                         ),
-                                        blurRadius: 4,
-                                        spreadRadius: 1,
-                                        offset: const Offset(0, 2),
+                                        backgroundColor: Colors.red,
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE1F2D9),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black12,
+                                      blurRadius: 4,
+                                      spreadRadius: 1,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Flight ${flight.id}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF2E7D32),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ...flight.players.map(
+                                        (playerName) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 4,
+                                          ),
+                                          child: Text(
+                                            playerName,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  child: Text(
-                                    gameType,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : const Color(0xFF2E7D32),
-                                    ),
-                                  ),
                                 ),
                               ),
-                            );
-                          }).toList(),
-                        ),
+                            ),
+                          );
+                        }).toList(),
                       ),
                     );
                   },
                 ),
 
-                const SizedBox(height: 16),
-
-                // Games Grid
-                Consumer<GameProvider>(
-                  builder: (context, gameProvider, child) {
-                    if (gameProvider.games.isEmpty) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: Text(
-                            'No games available',
-                            style: TextStyle(fontSize: 18, color: Colors.grey),
-                          ),
-                        ),
-                      );
-                    }
-
-                    final filteredGames = _filteredGames;
-
-                    if (filteredGames.isEmpty) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: Text(
-                            'No games found for selected type',
-                            style: TextStyle(fontSize: 18, color: Colors.grey),
-                          ),
-                        ),
-                      );
-                    }
-
-                    return Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: filteredGames.map((game) {
-                        return SizedBox(
-                          width: (MediaQuery.of(context).size.width - 64) / 2,
-                          child: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      GameScoringPage(game: game),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE1F2D9),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black12,
-                                    blurRadius: 4,
-                                    spreadRadius: 1,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Player names
-                                    ...game.playerNames.map(
-                                      (playerName) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 4,
-                                        ),
-                                        child: Text(
-                                          playerName,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.black,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 16),
+                const SizedBox(height: 32),
 
                 // Back to Landing Page Button
                 Padding(
